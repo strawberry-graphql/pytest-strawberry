@@ -1,0 +1,88 @@
+name: 🔂 Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: 🧪 ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Python 3.10 / pytest 8
+            python-version: "3.10"
+            pytest-version: "pytest>=8,<9"
+          - name: Python 3.10 / pytest 9
+            python-version: "3.10"
+            pytest-version: "pytest>=9,<10"
+          - name: Python 3.11 / pytest 9
+            python-version: "3.11"
+            pytest-version: "pytest>=9,<10"
+          - name: Python 3.12 / pytest 9
+            python-version: "3.12"
+            pytest-version: "pytest>=9,<10"
+          - name: Python 3.13 / pytest 9
+            python-version: "3.13"
+            pytest-version: "pytest>=9,<10"
+          - name: Python 3.14 / pytest 9
+            python-version: "3.14"
+            pytest-version: "pytest>=9,<10"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - run: uv sync --locked
+      - run: uv run --locked --with "${{ matrix.pytest-version }}" pytest -vv
+
+  quality:
+    name: ✨ Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv build
+
+  required-ci:
+    name: Required CI
+    if: ${{ always() }}
+    needs: [tests, quality]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check required jobs
+        env:
+          NEEDS: ${{ toJson(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key)=\(.value.result)"'
+          echo "$NEEDS" | jq -e 'to_entries | all(.value.result == "success")'
