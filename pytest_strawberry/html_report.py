@@ -66,15 +66,15 @@ body {
 .page {
   isolation: isolate;
   width: 100%;
-  max-width: 74rem;
+  max-width: 68rem;
   margin-inline: auto;
-  padding: 2.5rem 1rem 2rem;
+  padding: 1.5rem 1rem;
 }
 
 .report-header {
   display: grid;
-  gap: 2.5rem;
-  padding-bottom: 2.5rem;
+  gap: 1.5rem;
+  padding-bottom: 1.75rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -83,7 +83,7 @@ body {
 }
 
 .eyebrow {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   color: var(--accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8125rem;
@@ -110,15 +110,15 @@ h4 {
 }
 
 h1 {
-  max-width: 18ch;
-  margin-bottom: 0.75rem;
-  font-size: clamp(2.25rem, 7vw, 4.5rem);
-  letter-spacing: -0.045em;
+  max-width: 24ch;
+  margin-bottom: 0.5rem;
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: -0.04em;
 }
 
 h2 {
-  margin-bottom: 0.5rem;
-  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: 0.375rem;
+  font-size: clamp(1.375rem, 4vw, 1.625rem);
   letter-spacing: -0.025em;
 }
 
@@ -132,29 +132,22 @@ h3 {
 .empty-state p {
   color: var(--text-muted);
   font-size: 1rem;
-  line-height: 1.65;
+  line-height: 1.5;
   text-wrap: pretty;
 }
 
 .lede {
   max-width: 52ch;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.875rem;
 }
 
 .metadata {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.25rem 0.875rem;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
+.metadata-item {
   color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: 500;
@@ -167,7 +160,7 @@ h3 {
 }
 
 .score-label {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
   color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: 500;
@@ -175,16 +168,16 @@ h3 {
 
 .score-value {
   display: block;
-  margin-bottom: 1rem;
+  margin-bottom: 0.625rem;
   color: var(--tone);
-  font-size: clamp(3rem, 12vw, 5rem);
+  font-size: clamp(2.5rem, 9vw, 3.5rem);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: -0.055em;
 }
 
 .meter {
-  height: 0.5rem;
+  height: 0.375rem;
   overflow: hidden;
   border-radius: 999px;
   background: var(--surface-strong);
@@ -214,7 +207,7 @@ h3 {
 
 .stats-container {
   container: stats / inline-size;
-  padding-block: 1.75rem;
+  padding-block: 1rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -228,7 +221,7 @@ h3 {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  padding-block: 1rem;
+  padding-block: 0.625rem;
 }
 
 .stat + .stat {
@@ -245,7 +238,7 @@ h3 {
 .stat dd {
   margin: 0;
   color: var(--text);
-  font-size: 1.75rem;
+  font-size: 1.375rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -259,7 +252,7 @@ h3 {
   .stat {
     display: block;
     min-width: 0;
-    padding: 0 1.5rem;
+    padding: 0 1rem;
   }
 
   .stat:first-child {
@@ -277,18 +270,18 @@ h3 {
 
   .stat dt {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
   }
 }
 
 .notices {
   display: grid;
   gap: 0.75rem;
-  padding-top: 2rem;
+  padding-top: 1.25rem;
 }
 
 .notice {
-  padding: 1rem 1.125rem;
+  padding: 0.75rem 0.875rem;
   border-left: 3px solid var(--tone);
   border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--tone-soft);
@@ -310,11 +303,11 @@ h3 {
 }
 
 .schemas {
-  padding-top: 4rem;
+  padding-top: 2.5rem;
 }
 
 .section-heading {
-  padding-bottom: 1.5rem;
+  padding-bottom: 1rem;
 }
 
 .section-description {
@@ -323,18 +316,24 @@ h3 {
 }
 
 .schema {
-  padding-block: 2rem;
+  padding-block: 1.25rem;
   border-top: 1px solid var(--border-strong);
 }
 
 .schema-header {
-  padding-bottom: 1.25rem;
+  padding-bottom: 0.875rem;
+}
+
+.schema-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.875rem;
 }
 
 .schema-label {
-  margin-bottom: 0.375rem;
   color: var(--text-muted);
-  font-size: 0.875rem;
 }
 
 .schema-code {
@@ -343,12 +342,16 @@ h3 {
   background: var(--surface-strong);
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.925em;
+  font-size: 1em;
   font-weight: 500;
 }
 
 .schema-score {
-  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin-top: 0.75rem;
   color: var(--tone);
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
@@ -356,11 +359,10 @@ h3 {
   text-align: left;
 }
 
-.schema-score small {
-  display: block;
-  margin-top: 0.25rem;
+.schema-count {
+  margin: 0;
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: 1rem;
   font-weight: 400;
 }
 
@@ -369,13 +371,13 @@ h3 {
 }
 
 .type {
-  padding-block: 1.5rem;
+  padding-block: 1rem;
   border-bottom: 1px solid var(--border);
 }
 
 .type-header {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
 }
@@ -407,7 +409,7 @@ h3 {
 
 .field-table {
   width: 100%;
-  margin-top: 1rem;
+  margin-top: 0.625rem;
   border-collapse: collapse;
   table-layout: fixed;
   text-align: left;
@@ -415,18 +417,15 @@ h3 {
 
 .field-row {
   --field-tone: var(--high);
-  --field-background: var(--high-soft);
 }
 
 .field-row[data-status="missing"] {
   --field-tone: var(--low);
-  --field-background: var(--low-soft);
 }
 
 .field-row > * {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--border);
-  background: var(--field-background);
   font-size: 1rem;
   line-height: 1.5;
 }
@@ -436,7 +435,7 @@ h3 {
 }
 
 .field-name-cell {
-  box-shadow: inset 0.1875rem 0 var(--field-tone);
+  box-shadow: inset 0.125rem 0 var(--field-tone);
   color: var(--text);
   font-weight: 400;
   overflow-wrap: anywhere;
@@ -447,7 +446,7 @@ h3 {
 }
 
 .field-state-cell {
-  width: 7rem;
+  width: 6.5rem;
   color: var(--field-tone);
   font-weight: 600;
   text-align: right;
@@ -474,7 +473,7 @@ h3 {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
-  padding-top: 2rem;
+  padding-top: 1.25rem;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.8125rem;
@@ -499,13 +498,13 @@ h3 {
 
 @media (min-width: 48rem) {
   .page {
-    padding: 4rem 2rem 3rem;
+    padding: 2.5rem 1.5rem 2rem;
   }
 
   .report-header {
     grid-template-columns: minmax(0, 3fr) minmax(15rem, 2fr);
     align-items: end;
-    padding-bottom: 3.5rem;
+    padding-bottom: 2rem;
   }
 
   .lede,
@@ -529,6 +528,10 @@ h3 {
 
   .type-summary {
     font-size: 0.875rem;
+  }
+
+  .schema-count {
+    font-size: 0.8125rem;
   }
 
   .field-row > * {
@@ -679,9 +682,11 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
             Runtime coverage of Strawberry GraphQL schema fields.
           </p>
           <div class="metadata" aria-label="Report configuration">
-            <span class="badge">{mode}</span>
-            <span class="badge">graphql-core {escape(controller.graphql_version)}</span>
-            <span class="badge">{subscription_status}</span>
+            <span class="metadata-item">{mode}</span>
+            <span class="metadata-item">
+              graphql-core {escape(controller.graphql_version)}
+            </span>
+            <span class="metadata-item">{subscription_status}</span>
           </div>
         </div>
         <div class="score" data-tone="{tone}">
@@ -790,18 +795,16 @@ def _render_schema(schema: SchemaCoverage, position: int) -> str:
     return f"""
           <article class="schema" aria-labelledby="schema-{schema.fingerprint}">
             <header class="schema-header">
-              <div>
-                <p class="schema-label">Schema {position}</p>
-                <h3 id="schema-{schema.fingerprint}">
-                  <code class="schema-code">{schema.fingerprint}</code>
-                </h3>
-              </div>
+              <h3 class="schema-identity" id="schema-{schema.fingerprint}">
+                <span class="schema-label">Schema {position}</span>
+                <code class="schema-code">{schema.fingerprint}</code>
+              </h3>
               <div class="schema-score" data-tone="{tone}">
                 {schema.percentage:.2f}%
-                <small>
-                  {schema.hit_count}/{schema.field_count} fields,
+                <p class="schema-count">
+                  {schema.hit_count}/{schema.field_count} covered ·
                   {schema.missing_count} missing
-                </small>
+                </p>
               </div>
             </header>
             <div class="type-list">
