@@ -39,7 +39,7 @@ def test_resolver_coverage_is_the_default(pytester: pytest.Pytester) -> None:
     result.assert_outcomes(passed=1)
     output = result.stdout.str()
     assert "┌" in output
-    assert "│ Type" in output
+    assert "│ Python type" in output
     assert "│ All types" in output
     assert "└" in output
     result.stdout.fnmatch_lines(
@@ -94,6 +94,47 @@ def test_all_fields_mode_includes_default_resolution(pytester: pytest.Pytester) 
     )
 
 
+def test_report_uses_python_names_and_shows_explicit_graphql_aliases(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type(name="PublicUser")
+        class UserModel:
+            @strawberry.field
+            def display_name(self) -> str:
+                return "Patrick"
+
+            @strawberry.field(name="legacyLabel")
+            def legacy_label(self) -> str:
+                return "Patrick"
+
+        @strawberry.type(name="RootQuery")
+        class QueryRoot:
+            @strawberry.field
+            def current_user(self) -> UserModel:
+                return UserModel()
+
+        schema = strawberry.Schema(query=QueryRoot)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ currentUser { __typename } }")
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess("--strawberry-coverage", "-q")
+
+    result.assert_outcomes(passed=1)
+    output = result.stdout.str()
+    assert "QueryRoot [RootQuery]" in output
+    assert "UserModel [PublicUser]" in output
+    assert "display_name, legacy_label [legacyLabel]" in output
+    assert "displayName" not in output
+
+
 def test_report_wraps_long_missing_fields_to_the_terminal_width(
     pytester: pytest.Pytester,
     monkeypatch: pytest.MonkeyPatch,
@@ -133,6 +174,8 @@ def test_report_wraps_long_missing_fields_to_the_terminal_width(
     ]
     assert table_lines
     assert all(len(line) <= _TERMINAL_WIDTH for line in table_lines)
+    assert "uncovered [thisIsAVeryLongUn" in result.stdout.str()
+    assert "coveredGraphqlFieldNameThatW" in result.stdout.str()
 
 
 def test_only_invoked_fields_count_and_raised_resolvers_count(
@@ -569,6 +612,44 @@ def test_distinct_schemas_get_separate_tables(pytester: pytest.Pytester) -> None
 
     result.assert_outcomes(passed=1)
     assert result.stdout.str().count("Schema ") == _DISTINCT_SCHEMA_COUNT
+    result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
+
+
+def test_python_metadata_keeps_identical_graphql_universes_separate(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type(name="Query")
+        class FirstRoot:
+            @strawberry.field(name="value")
+            def first_value(self) -> str:
+                return "first"
+
+        @strawberry.type(name="Query")
+        class SecondRoot:
+            @strawberry.field(name="value")
+            def second_value(self) -> str:
+                return "second"
+
+        first_schema = strawberry.Schema(query=FirstRoot)
+        second_schema = strawberry.Schema(query=SecondRoot)
+
+        def test_schemas() -> None:
+            assert first_schema.execute_sync("{ value }").errors is None
+            assert second_schema.execute_sync("{ value }").errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess("--strawberry-coverage", "-q")
+
+    result.assert_outcomes(passed=1)
+    output = result.stdout.str()
+    assert output.count("Schema ") == _DISTINCT_SCHEMA_COUNT
+    assert "FirstRoot [Query]" in output
+    assert "SecondRoot [Query]" in output
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
 
 

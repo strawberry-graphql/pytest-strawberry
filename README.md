@@ -32,18 +32,22 @@ attribute access:
 ============================= Strawberry coverage =============================
 Subscriptions: excluded (requires graphql-core 3.3+); graphql-core 3.2.11
 
-Schema a83c741d
-┌───────────┬────────┬──────┬─────────┬────────────────┐
-│ Type      │ Fields │ Miss │   Cover │ Missing fields │
-├───────────┼────────┼──────┼─────────┼────────────────┤
-│ Query     │      2 │    0 │ 100.00% │                │
-│ User      │      3 │    1 │  66.67% │ email          │
-├───────────┼────────┼──────┼─────────┼────────────────┤
-│ All types │      5 │    1 │  80.00% │                │
-└───────────┴────────┴──────┴─────────┴────────────────┘
+Schema b6016cac
+┌───────────────────┬────────┬──────┬─────────┬───────────────────────┐
+│ Python type       │ Fields │ Miss │   Cover │ Missing fields        │
+├───────────────────┼────────┼──────┼─────────┼───────────────────────┤
+│ QueryRoot [Query] │      2 │    0 │ 100.00% │                       │
+│ UserModel [User]  │      3 │    1 │  66.67% │ email_address [email] │
+├───────────────────┼────────┼──────┼─────────┼───────────────────────┤
+│ All types         │      5 │    1 │  80.00% │                       │
+└───────────────────┴────────┴──────┴─────────┴───────────────────────┘
 
 Overall coverage: 80.00% (4/5 fields, 1 missing)
 ```
+
+The table uses Python class and field names so uncovered resolvers are directly
+searchable in the codebase. When `name=` explicitly changes a GraphQL name, the
+GraphQL alias is shown in brackets. Automatic camel-casing is not repeated.
 
 Use `all` mode to include Strawberry fields that use default attribute
 resolution:
@@ -66,9 +70,10 @@ pytest --strawberry-coverage --strawberry-coverage-fail-under=90
 The threshold is compared with the displayed percentage rounded to two decimal
 places. Mode and threshold options require `--strawberry-coverage`.
 
-Structurally different field universes receive separate fingerprinted tables;
-identical universes are merged. The final threshold uses their combined field
-and hit totals. Coverage from pytest-xdist workers is merged automatically.
+Field universes with different GraphQL coordinates or Python mappings receive
+separate fingerprinted tables; identical universes are merged. The final
+threshold uses their combined field and hit totals. Coverage from pytest-xdist
+workers is merged automatically.
 
 ### Subscriptions
 

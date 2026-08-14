@@ -28,6 +28,7 @@ _LOW_COVERAGE = 50
 _MIN_TABLE_WIDTH = 72
 _MAX_TABLE_WIDTH = 160
 _SUMMARY_ROW_NAME = "All types"
+_TYPE_HEADER = "Python type"
 
 
 @dataclass
@@ -240,7 +241,7 @@ def _write_schema_report(
     terminalreporter.write_line(f"Schema {schema.fingerprint}", bold=True)
 
     type_width = max(
-        len("Type"),
+        len(_TYPE_HEADER),
         len(_SUMMARY_ROW_NAME),
         *(len(type_report.name) for type_report in schema.types),
     )
@@ -275,7 +276,7 @@ def _write_schema_report(
     terminalreporter.write_line(_table_border("┌", "┬", "┐", widths))
     terminalreporter.write_line(
         _table_row(
-            ("Type", "Fields", "Miss", "Cover", "Missing fields"),
+            (_TYPE_HEADER, "Fields", "Miss", "Cover", "Missing fields"),
             widths,
             align_right=(False, True, True, True, False),
         ),

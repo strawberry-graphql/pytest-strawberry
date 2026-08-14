@@ -21,6 +21,7 @@ from graphql import (
 )
 from strawberry.extensions import SchemaExtension
 from strawberry.schema.schema import Schema
+from strawberry.types.base import StrawberryObjectDefinition
 from strawberry.types.graphql import OperationType
 
 if TYPE_CHECKING:
@@ -28,7 +29,40 @@ if TYPE_CHECKING:
 
 CoverageMode = Literal["resolvers", "all"]
 Coordinate = tuple[str, str]
-UniverseKey = tuple[Coordinate, ...]
+
+
+@dataclass(frozen=True, order=True)
+class FieldDefinition:
+    """Runtime GraphQL coordinate and its Python-facing display metadata."""
+
+    graphql_type_name: str
+    graphql_field_name: str
+    python_type_name: str
+    python_field_name: str
+    explicit_graphql_field_name: str | None
+
+    @property
+    def coordinate(self) -> Coordinate:
+        """Return the GraphQL coordinate used during execution."""
+        return self.graphql_type_name, self.graphql_field_name
+
+    @property
+    def display_type_name(self) -> str:
+        """Return the Python type name, including an explicit GraphQL alias."""
+        if self.python_type_name == self.graphql_type_name:
+            return self.python_type_name
+        return f"{self.python_type_name} [{self.graphql_type_name}]"
+
+    @property
+    def display_field_name(self) -> str:
+        """Return the Python field name, including an explicit GraphQL alias."""
+        alias = self.explicit_graphql_field_name
+        if alias is None or alias == self.python_field_name:
+            return self.python_field_name
+        return f"{self.python_field_name} [{alias}]"
+
+
+UniverseKey = tuple[FieldDefinition, ...]
 
 
 class _GetExtensions(Protocol):
@@ -39,8 +73,16 @@ class _GetExtensions(Protocol):
     ) -> list[SchemaExtension]: ...
 
 
+class _SerializedField(TypedDict):
+    graphql_type_name: str
+    graphql_field_name: str
+    python_type_name: str
+    python_field_name: str
+    explicit_graphql_field_name: str | None
+
+
 class _SerializedUniverse(TypedDict):
-    coordinates: list[list[str]]
+    fields: list[_SerializedField]
     hits: list[list[str]]
 
 
@@ -53,13 +95,20 @@ class CoverageSnapshot(TypedDict):
 
 @dataclass
 class _Universe:
-    coordinates: UniverseKey
+    fields: UniverseKey
     hits: set[Coordinate] = field(default_factory=set)
+    coordinates: frozenset[Coordinate] = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Cache the GraphQL coordinates checked for every resolver call."""
+        self.coordinates = frozenset(
+            field_definition.coordinate for field_definition in self.fields
+        )
 
 
 @dataclass(frozen=True)
 class TypeCoverage:
-    """Coverage values for one concrete GraphQL object type."""
+    """Coverage values for one Python type backing a GraphQL object."""
 
     name: str
     fields: tuple[str, ...]
@@ -97,7 +146,7 @@ class SchemaCoverage:
 
 @dataclass(frozen=True)
 class CoverageReport:
-    """Immutable terminal-report input."""
+    """Immutable reporter input."""
 
     schemas: tuple[SchemaCoverage, ...]
     field_count: int
@@ -199,7 +248,18 @@ class CoverageController:
         with self._lock:
             universes = [
                 _SerializedUniverse(
-                    coordinates=[list(coordinate) for coordinate in key],
+                    fields=[
+                        _SerializedField(
+                            graphql_type_name=field_definition.graphql_type_name,
+                            graphql_field_name=field_definition.graphql_field_name,
+                            python_type_name=field_definition.python_type_name,
+                            python_field_name=field_definition.python_field_name,
+                            explicit_graphql_field_name=(
+                                field_definition.explicit_graphql_field_name
+                            ),
+                        )
+                        for field_definition in key
+                    ],
                     hits=[list(coordinate) for coordinate in sorted(data.hits)],
                 )
                 for key, data in sorted(self._universes.items())
@@ -215,17 +275,15 @@ class CoverageController:
         """Merge one xdist worker snapshot."""
         with self._lock:
             for serialized in snapshot["universes"]:
-                coordinates = tuple(
-                    (type_name, field_name)
-                    for type_name, field_name in serialized["coordinates"]
+                fields = tuple(
+                    FieldDefinition(**serialized_field)
+                    for serialized_field in serialized["fields"]
                 )
-                universe = self._universes.setdefault(
-                    coordinates, _Universe(coordinates)
-                )
+                universe = self._universes.setdefault(fields, _Universe(fields))
                 universe.hits.update(
                     (type_name, field_name)
                     for type_name, field_name in serialized["hits"]
-                    if (type_name, field_name) in coordinates
+                    if (type_name, field_name) in universe.coordinates
                 )
             self._unsupported_subscription_executed |= snapshot[
                 "unsupported_subscription_executed"
@@ -240,29 +298,43 @@ class CoverageController:
             )
 
         schemas: list[SchemaCoverage] = []
-        for coordinates, hits in universes:
-            type_fields: dict[str, list[str]] = {}
-            for type_name, field_name in coordinates:
-                type_fields.setdefault(type_name, []).append(field_name)
-
-            type_reports = tuple(
-                TypeCoverage(
-                    name=type_name,
-                    fields=tuple(fields),
-                    missing=tuple(
-                        field_name
-                        for field_name in fields
-                        if (type_name, field_name) not in hits
-                    ),
+        for fields, hits in universes:
+            type_fields: dict[str, list[FieldDefinition]] = {}
+            for field_definition in fields:
+                type_fields.setdefault(field_definition.display_type_name, []).append(
+                    field_definition
                 )
-                for type_name, fields in sorted(type_fields.items())
-            )
+
+            type_reports: list[TypeCoverage] = []
+            for type_name, field_definitions in sorted(type_fields.items()):
+                ordered_fields = sorted(
+                    field_definitions,
+                    key=lambda item: item.display_field_name,
+                )
+                type_reports.append(
+                    TypeCoverage(
+                        name=type_name,
+                        fields=tuple(
+                            field_definition.display_field_name
+                            for field_definition in ordered_fields
+                        ),
+                        missing=tuple(
+                            field_definition.display_field_name
+                            for field_definition in ordered_fields
+                            if field_definition.coordinate not in hits
+                        ),
+                    )
+                )
             schemas.append(
                 SchemaCoverage(
-                    fingerprint=_fingerprint(coordinates),
-                    types=type_reports,
-                    field_count=len(coordinates),
-                    hit_count=len(hits.intersection(coordinates)),
+                    fingerprint=_fingerprint(fields),
+                    types=tuple(type_reports),
+                    field_count=len(fields),
+                    hit_count=len(
+                        hits.intersection(
+                            field_definition.coordinate for field_definition in fields
+                        )
+                    ),
                 )
             )
 
@@ -283,15 +355,15 @@ class CoverageController:
         if existing is not None:
             return existing
 
-        coordinates = _build_coordinates(
+        fields = _build_fields(
             schema,
             mode=self.mode,
             include_subscriptions=self.supports_subscriptions,
         )
         with self._lock:
-            self._schema_universes[schema] = coordinates
-            self._universes.setdefault(coordinates, _Universe(coordinates))
-        return coordinates
+            self._schema_universes[schema] = fields
+            self._universes.setdefault(fields, _Universe(fields))
+        return fields
 
 
 class _CoverageExtension(SchemaExtension):
@@ -321,7 +393,7 @@ class _CoverageExtension(SchemaExtension):
         yield None
 
 
-def _build_coordinates(
+def _build_fields(
     schema: Schema, *, mode: CoverageMode, include_subscriptions: bool
 ) -> UniverseKey:
     document_schema = build_ast_schema(
@@ -334,7 +406,7 @@ def _build_coordinates(
 
     pending = deque(root for root in roots if root is not None)
     visited: set[str] = set()
-    coordinates: set[Coordinate] = set()
+    fields: set[FieldDefinition] = set()
 
     while pending:
         object_type = pending.popleft()
@@ -343,10 +415,15 @@ def _build_coordinates(
         visited.add(object_type.name)
 
         for field_name, graphql_field in object_type.fields.items():
-            if not field_name.startswith("__") and _field_is_eligible(
-                schema, object_type.name, field_name, mode
-            ):
-                coordinates.add((object_type.name, field_name))
+            if not field_name.startswith("__"):
+                field_definition = _build_field_definition(
+                    schema,
+                    object_type.name,
+                    field_name,
+                    mode,
+                )
+                if field_definition is not None:
+                    fields.add(field_definition)
 
             named_type = get_named_type(graphql_field.type)
             if isinstance(named_type, GraphQLObjectType):
@@ -356,19 +433,40 @@ def _build_coordinates(
             elif isinstance(named_type, GraphQLUnionType):
                 pending.extend(named_type.types)
 
-    return tuple(sorted(coordinates))
+    return tuple(sorted(fields))
 
 
-def _field_is_eligible(
+def _build_field_definition(
     schema: Schema,
     type_name: str,
     field_name: str,
     mode: CoverageMode,
-) -> bool:
-    if mode == "all":
-        return True
+) -> FieldDefinition | None:
     strawberry_field = schema.get_field_for_type(field_name, type_name)
-    return strawberry_field is not None and strawberry_field.base_resolver is not None
+    if mode == "resolvers" and (
+        strawberry_field is None or strawberry_field.base_resolver is None
+    ):
+        return None
+
+    type_definition = schema.get_type_by_name(type_name)
+    python_type_name = (
+        type_definition.origin.__name__
+        if isinstance(type_definition, StrawberryObjectDefinition)
+        else type_name
+    )
+    python_field_name = (
+        strawberry_field.python_name if strawberry_field is not None else field_name
+    )
+    explicit_graphql_field_name = (
+        strawberry_field.graphql_name if strawberry_field is not None else None
+    )
+    return FieldDefinition(
+        graphql_type_name=type_name,
+        graphql_field_name=field_name,
+        python_type_name=python_type_name,
+        python_field_name=python_field_name,
+        explicit_graphql_field_name=explicit_graphql_field_name,
+    )
 
 
 def _percentage(field_count: int, hit_count: int, *, observed_schema: bool) -> float:
@@ -377,8 +475,17 @@ def _percentage(field_count: int, hit_count: int, *, observed_schema: bool) -> f
     return round(hit_count / field_count * 100, 2)
 
 
-def _fingerprint(coordinates: UniverseKey) -> str:
+def _fingerprint(fields: UniverseKey) -> str:
     value = "\0".join(
-        f"{type_name}.{field_name}" for type_name, field_name in coordinates
+        ":".join(
+            (
+                field_definition.graphql_type_name,
+                field_definition.graphql_field_name,
+                field_definition.python_type_name,
+                field_definition.python_field_name,
+                field_definition.explicit_graphql_field_name or "",
+            )
+        )
+        for field_definition in fields
     )
     return sha256(value.encode()).hexdigest()[:8]
