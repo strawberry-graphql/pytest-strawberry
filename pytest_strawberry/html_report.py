@@ -72,18 +72,12 @@ body {
 }
 
 .report-header {
-  display: grid;
-  gap: 1.5rem;
-  padding-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 
-.title-group {
-  min-width: 0;
-}
-
 .eyebrow {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.375rem;
   color: var(--accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8125rem;
@@ -110,10 +104,9 @@ h4 {
 }
 
 h1 {
-  max-width: 24ch;
-  margin-bottom: 0.5rem;
-  font-size: clamp(2rem, 6vw, 3rem);
-  letter-spacing: -0.04em;
+  margin-bottom: 0.375rem;
+  font-size: 1.5rem;
+  letter-spacing: -0.035em;
 }
 
 h2 {
@@ -127,8 +120,6 @@ h3 {
   font-size: 1.125rem;
 }
 
-.lede,
-.section-description,
 .empty-state p {
   color: var(--text-muted);
   font-size: 1rem;
@@ -136,58 +127,12 @@ h3 {
   text-wrap: pretty;
 }
 
-.lede {
-  max-width: 52ch;
-  margin-bottom: 0.875rem;
-}
-
 .metadata {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.875rem;
-}
-
-.metadata-item {
+  margin-bottom: 0;
   color: var(--text-muted);
   font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.score {
-  align-self: end;
-  min-width: 0;
-}
-
-.score-label {
-  margin-bottom: 0.25rem;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.score-value {
-  display: block;
-  margin-bottom: 0.625rem;
-  color: var(--tone);
-  font-size: clamp(2.5rem, 9vw, 3.5rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.055em;
-}
-
-.meter {
-  height: 0.375rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--surface-strong);
-}
-
-.meter-fill {
-  width: var(--coverage);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--tone);
+  font-style: italic;
+  line-height: 1.5;
 }
 
 [data-tone="high"] {
@@ -203,75 +148,6 @@ h3 {
 [data-tone="low"] {
   --tone: var(--low);
   --tone-soft: var(--low-soft);
-}
-
-.stats-container {
-  container: stats / inline-size;
-  padding-block: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.stats {
-  display: grid;
-  margin: 0;
-}
-
-.stat {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-block: 0.625rem;
-}
-
-.stat + .stat {
-  border-top: 1px solid var(--border);
-}
-
-.stat dt {
-  color: var(--text-muted);
-  font-size: 1rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.stat dd {
-  margin: 0;
-  color: var(--text);
-  font-size: 1.375rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-}
-
-@container stats (min-width: 38rem) {
-  .stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .stat {
-    display: block;
-    min-width: 0;
-    padding: 0 1rem;
-  }
-
-  .stat:first-child {
-    padding-left: 0;
-  }
-
-  .stat:last-child {
-    padding-right: 0;
-  }
-
-  .stat + .stat {
-    border-top: 0;
-    border-left: 1px solid var(--border);
-  }
-
-  .stat dt {
-    display: block;
-    margin-bottom: 0.25rem;
-  }
 }
 
 .notices {
@@ -303,37 +179,24 @@ h3 {
 }
 
 .schemas {
-  padding-top: 2.5rem;
-}
-
-.section-heading {
-  padding-bottom: 1rem;
-}
-
-.section-description {
-  max-width: 62ch;
-  margin-bottom: 0;
+  padding-top: 1.75rem;
 }
 
 .schema {
-  padding-block: 1.25rem;
-  border-top: 1px solid var(--border-strong);
+  padding-bottom: 2rem;
 }
 
 .schema-header {
-  padding-bottom: 0.875rem;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
 }
 
 .schema-identity {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  font-size: 0.875rem;
-}
-
-.schema-label {
-  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  font-size: 1.125rem;
 }
 
 .schema-code {
@@ -347,72 +210,126 @@ h3 {
 }
 
 .schema-score {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.5rem;
-  margin-top: 0.75rem;
   color: var(--tone);
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  text-align: left;
 }
 
 .schema-count {
   margin: 0;
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 400;
 }
 
 .type-list {
-  border-top: 1px solid var(--border);
+  --type-columns: minmax(0, 1fr) 4.75rem 3.25rem 3.25rem;
+  border-top: 1px solid var(--border-strong);
+}
+
+.type-columns,
+.type-summary-row,
+.type-total {
+  display: grid;
+  grid-template-columns: var(--type-columns);
+  align-items: baseline;
+}
+
+.type-columns {
+  padding: 0.5rem 0.5rem 0.375rem 1.75rem;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.type-columns > :not(:first-child),
+.type-summary-row > :not(:first-child),
+.type-total > :not(:first-child) {
+  text-align: right;
 }
 
 .type {
-  padding-block: 1rem;
   border-bottom: 1px solid var(--border);
 }
 
-.type-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+.type-summary-row {
+  position: relative;
+  padding: 0.625rem 0.5rem 0.625rem 1.75rem;
+  cursor: pointer;
+  font-size: 1rem;
+  list-style: none;
 }
 
-.type-heading {
-  min-width: 0;
+.type-summary-row::-webkit-details-marker {
+  display: none;
+}
+
+.type-summary-row::before {
+  position: absolute;
+  left: 0.5rem;
+  color: var(--text-muted);
+  content: "+";
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+}
+
+.type[open] > .type-summary-row::before {
+  content: "-";
+}
+
+.type-summary-row:hover {
+  background: var(--surface);
+}
+
+.type-summary-row:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .type-name {
-  margin-bottom: 0;
+  min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 1rem;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.type-summary {
-  margin: 0.375rem 0 0;
-  color: var(--text-muted);
-  font-size: 1rem;
-}
-
-.type-score {
-  flex: 0 0 auto;
+.type-percentage {
   color: var(--tone);
-  font-size: 1rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
+.type-number {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.type-details {
+  padding: 0 0.5rem 0.75rem 1.75rem;
+}
+
 .field-table {
   width: 100%;
-  margin-top: 0.625rem;
   border-collapse: collapse;
   table-layout: fixed;
   text-align: left;
+}
+
+.field-table thead th {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.field-table thead th:last-child {
+  text-align: right;
 }
 
 .field-row {
@@ -424,7 +341,7 @@ h3 {
 }
 
 .field-row > * {
-  padding: 0.5rem 0.75rem;
+  padding: 0.4375rem 0.75rem;
   border-top: 1px solid var(--border);
   font-size: 1rem;
   line-height: 1.5;
@@ -451,6 +368,17 @@ h3 {
   font-weight: 600;
   text-align: right;
   white-space: nowrap;
+}
+
+.type-total {
+  padding: 0.625rem 0.5rem 0.625rem 1.75rem;
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.type-total-label {
+  color: var(--text);
 }
 
 .empty-state {
@@ -501,37 +429,21 @@ h3 {
     padding: 2.5rem 1.5rem 2rem;
   }
 
-  .report-header {
-    grid-template-columns: minmax(0, 3fr) minmax(15rem, 2fr);
-    align-items: end;
-    padding-bottom: 2rem;
+  h1 {
+    font-size: 2.125rem;
   }
 
-  .lede,
-  .section-description,
   .empty-state p {
     font-size: 0.9375rem;
   }
 
-  .schema-header {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 1.5rem;
+  .type-list {
+    --type-columns: minmax(0, 1fr) 5.5rem 4rem 4rem;
   }
 
-  .schema-score {
-    flex: 0 0 auto;
-    margin-top: 0;
-    text-align: right;
-  }
-
-  .type-summary {
+  .type-summary-row,
+  .type-total {
     font-size: 0.875rem;
-  }
-
-  .schema-count {
-    font-size: 0.8125rem;
   }
 
   .field-row > * {
@@ -582,24 +494,12 @@ h3 {
     padding: 0;
   }
 
-  h1 {
-    font-size: 3rem;
-  }
-
-  .score-value {
-    font-size: 3.5rem;
-  }
-
-  .schemas {
-    padding-top: 2rem;
-  }
-
-  .schema {
-    padding-block: 1.25rem;
+  .type:not([open]) > .type-details {
+    display: block !important;
   }
 
   .schema-header,
-  .type-header,
+  .type-summary-row,
   .field-row,
   .report-footer {
     break-inside: avoid;
@@ -637,14 +537,7 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     )
     details = (
         f"""
-        <section class="schemas" aria-labelledby="schema-details">
-          <div class="section-heading">
-            <h2 id="schema-details">Schema details</h2>
-            <p class="section-description">
-              Every eligible field is grouped under the Python type that defines
-              it.
-            </p>
-          </div>
+        <section class="schemas" aria-label="Schema coverage">
           {schemas}
         </section>
         """
@@ -663,6 +556,7 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     )
     notices = _render_notices(report, controller)
     schema_count = len(report.schemas)
+    schema_label = _plural(schema_count, "schema")
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -674,48 +568,18 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
   </head>
   <body>
     <main class="page">
-      <header class="report-header">
-        <div class="title-group">
-          <p class="eyebrow">pytest-strawberry</p>
-          <h1>Field coverage</h1>
-          <p class="lede">
-            Runtime coverage of Strawberry GraphQL schema fields.
-          </p>
-          <div class="metadata" aria-label="Report configuration">
-            <span class="metadata-item">{mode}</span>
-            <span class="metadata-item">
-              graphql-core {escape(controller.graphql_version)}
-            </span>
-            <span class="metadata-item">{subscription_status}</span>
-          </div>
-        </div>
-        <div class="score" data-tone="{tone}">
-          <p class="score-label">Overall coverage</p>
-          <strong class="score-value">{report.percentage:.2f}%</strong>
-          <div
-            class="meter"
-            role="progressbar"
-            aria-label="Overall field coverage"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-valuenow="{report.percentage:.2f}"
-          >
-            <div
-              class="meter-fill"
-              style="--coverage: {report.percentage:.2f}%"
-            ></div>
-          </div>
-        </div>
+      <header class="report-header" data-tone="{tone}">
+        <p class="eyebrow">pytest-strawberry</p>
+        <h1>
+          Strawberry coverage:
+          <span class="type-percentage">{report.percentage:.2f}%</span>
+        </h1>
+        <p class="metadata">
+          {mode}, graphql-core {escape(controller.graphql_version)},
+          {subscription_status.lower()}, {report.hit_count}/{report.field_count}
+          fields covered, {schema_count} {schema_label}
+        </p>
       </header>
-
-      <section class="stats-container" aria-label="Coverage summary">
-        <dl class="stats">
-          {_render_stat("Covered", report.hit_count, "covered")}
-          {_render_stat("Missing", report.missing_count, "missing")}
-          {_render_stat("Eligible", report.field_count, "eligible")}
-          {_render_stat("Schemas", schema_count, _plural(schema_count, "schema"))}
-        </dl>
-      </section>
 
       {notices}
       {details}
@@ -728,14 +592,6 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
   </body>
 </html>
 """
-
-
-def _render_stat(label: str, value: int, spoken_label: str) -> str:
-    return f"""
-          <div class="stat" aria-label="{value} {spoken_label}">
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>"""
 
 
 def _render_notices(
@@ -795,20 +651,40 @@ def _render_schema(schema: SchemaCoverage, position: int) -> str:
     return f"""
           <article class="schema" aria-labelledby="schema-{schema.fingerprint}">
             <header class="schema-header">
-              <h3 class="schema-identity" id="schema-{schema.fingerprint}">
-                <span class="schema-label">Schema {position}</span>
-                <code class="schema-code">{schema.fingerprint}</code>
-              </h3>
-              <div class="schema-score" data-tone="{tone}">
-                {schema.percentage:.2f}%
+              <div>
+                <h2 class="schema-identity" id="schema-{schema.fingerprint}">
+                  Schema {position}
+                  <code class="schema-code">{schema.fingerprint}</code>
+                </h2>
                 <p class="schema-count">
                   {schema.hit_count}/{schema.field_count} covered ·
                   {schema.missing_count} missing
                 </p>
               </div>
+              <strong class="schema-score" data-tone="{tone}">
+                {schema.percentage:.2f}%
+              </strong>
             </header>
             <div class="type-list">
+              <div class="type-columns" aria-hidden="true">
+                <span>Python type</span>
+                <span>Coverage</span>
+                <span>Fields</span>
+                <span>Miss</span>
+              </div>
               {types}
+              <div
+                class="type-total"
+                aria-label="All types, {schema.percentage:.2f}% coverage,
+                  {schema.field_count} fields, {schema.missing_count} missing"
+              >
+                <strong class="type-total-label">All types</strong>
+                <strong class="type-percentage" data-tone="{tone}">
+                  {schema.percentage:.2f}%
+                </strong>
+                <span class="type-number">{schema.field_count}</span>
+                <span class="type-number">{schema.missing_count}</span>
+              </div>
             </div>
           </article>
 """
@@ -826,37 +702,38 @@ def _render_type(
     )
     type_id = f"schema-{schema_fingerprint}-type-{position}"
     return f"""
-              <section class="type" aria-labelledby="{type_id}">
-                <header class="type-header">
-                  <div class="type-heading">
-                    <h4 class="type-name" id="{type_id}">
-                      {escape(type_report.name)}
-                    </h4>
-                    <p class="type-summary">
-                      {type_report.field_count}
-                      {_plural(type_report.field_count, "field")} ·
-                      {missing} missing
-                    </p>
-                  </div>
-                  <strong class="type-score" data-tone="{tone}">
+              <details class="type">
+                <summary
+                  class="type-summary-row"
+                  id="{type_id}"
+                  aria-label="{escape(type_report.name)},
+                    {type_report.percentage:.2f}% coverage,
+                    {type_report.field_count} fields, {missing} missing"
+                >
+                  <span class="type-name">{escape(type_report.name)}</span>
+                  <strong class="type-percentage" data-tone="{tone}">
                     {type_report.percentage:.2f}%
                   </strong>
-                </header>
-                <table class="field-table">
-                  <caption class="sr-only">
-                    Field coverage for {escape(type_report.name)}
-                  </caption>
-                  <thead>
-                    <tr class="sr-only">
-                      <th scope="col">Field</th>
-                      <th scope="col">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fields}
-                  </tbody>
-                </table>
-              </section>"""
+                  <span class="type-number">{type_report.field_count}</span>
+                  <span class="type-number">{missing}</span>
+                </summary>
+                <div class="type-details">
+                  <table class="field-table">
+                    <caption class="sr-only">
+                      Field coverage for {escape(type_report.name)}
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Python field</th>
+                        <th scope="col">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fields}
+                    </tbody>
+                  </table>
+                </div>
+              </details>"""
 
 
 def _render_field(field_report: FieldCoverage) -> str:

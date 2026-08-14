@@ -180,9 +180,14 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "<script" not in html
     assert "prefers-color-scheme: dark" in html
     assert "66.67%" in html
+    assert "Strawberry coverage:" in html
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
+    assert '<div class="type-columns" aria-hidden="true">' in html
+    assert '<details class="type">' in html
+    assert 'class="type-summary-row"' in html
     assert '<table class="field-table">' in html
+    assert '<th scope="col">Python field</th>' in html
     assert '<ul class="field-list"' not in html
     assert 'aria-label="viewer, covered"' in html
     assert 'aria-label="display_name, covered"' in html
