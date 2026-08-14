@@ -180,11 +180,13 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "<script" not in html
     assert "prefers-color-scheme: dark" in html
     assert "66.67%" in html
-    assert "Strawberry coverage:" in html
+    assert "<h1>Strawberry coverage</h1>" in html
+    assert 'class="eyebrow"' not in html
+    assert "subscriptions" not in html.lower()
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
     assert '<div class="type-columns" aria-hidden="true">' in html
-    assert '<details class="type">' in html
+    assert '<details class="type" open>' in html
     assert 'class="type-summary-row"' in html
     assert '<table class="field-table">' in html
     assert '<th scope="col">Python field</th>' in html
@@ -795,10 +797,14 @@ def test_subscription_coverage_matches_graphql_core_capability(
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-mode=all",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-n",
+        "2",
         "-q",
     )
 
     result.assert_outcomes(passed=1)
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
     if (graphql.version_info.major, graphql.version_info.minor) >= (3, 3):
         result.stdout.fnmatch_lines(
             [
@@ -806,6 +812,7 @@ def test_subscription_coverage_matches_graphql_core_capability(
                 "*Overall coverage: 100.00% (4/4 fields, 0 missing)*",
             ]
         )
+        assert "subscriptions included" in html.lower()
         assert "did not contribute" not in result.stdout.str()
     else:
         result.stdout.fnmatch_lines(
@@ -815,6 +822,7 @@ def test_subscription_coverage_matches_graphql_core_capability(
                 "*WARNING: Subscription executions did not contribute*",
             ]
         )
+        assert "subscriptions excluded" in html.lower()
 
 
 def test_collect_only_suppresses_reporting_and_gating(

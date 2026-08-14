@@ -91,7 +91,7 @@ class CoverageSnapshot(TypedDict):
     """JSON-serializable xdist worker output."""
 
     field_sets: list[_SerializedFieldSet]
-    unsupported_subscription_executed: bool
+    subscription_executed: bool
 
 
 @dataclass
@@ -205,7 +205,7 @@ class CoverageController:
             WeakKeyDictionary()
         )
         self._field_sets: dict[FieldSet, _FieldSetCoverage] = {}
-        self._unsupported_subscription_executed = False
+        self._subscription_executed = False
         self._original_get_extensions: _GetExtensions | None = None
         self._instrumented_get_extensions: _GetExtensions | None = None
 
@@ -247,10 +247,10 @@ class CoverageController:
             if coordinate in data.coordinates:
                 data.hits.add(coordinate)
 
-    def record_unsupported_subscription(self) -> None:
-        """Remember that graphql-core could not instrument a subscription."""
+    def record_subscription(self) -> None:
+        """Remember that a subscription operation was executed."""
         with self._lock:
-            self._unsupported_subscription_executed = True
+            self._subscription_executed = True
 
     def mark_missing_worker_output(self) -> None:
         """Mark an xdist worker whose coverage payload was unavailable."""
@@ -279,9 +279,7 @@ class CoverageController:
             ]
             return CoverageSnapshot(
                 field_sets=field_sets,
-                unsupported_subscription_executed=(
-                    self._unsupported_subscription_executed
-                ),
+                subscription_executed=self._subscription_executed,
             )
 
     def merge(self, snapshot: CoverageSnapshot) -> None:
@@ -300,9 +298,7 @@ class CoverageController:
                     for type_name, field_name in serialized["hits"]
                     if (type_name, field_name) in coverage.coordinates
                 )
-            self._unsupported_subscription_executed |= snapshot[
-                "unsupported_subscription_executed"
-            ]
+            self._subscription_executed |= snapshot["subscription_executed"]
 
     def report(self) -> CoverageReport:
         """Calculate immutable coverage values from the current aggregate."""
@@ -357,10 +353,15 @@ class CoverageController:
             hit_count=sum(schema.hit_count for schema in schemas),
         )
 
+    def subscription_executed(self) -> bool:
+        """Return whether the test run executed a subscription operation."""
+        with self._lock:
+            return self._subscription_executed
+
     def subscription_warning_needed(self) -> bool:
         """Return whether an uninstrumented 3.2 subscription was executed."""
         with self._lock:
-            return self._unsupported_subscription_executed
+            return not self.supports_subscriptions and self._subscription_executed
 
     def _observe_schema(self, schema: Schema) -> FieldSet:
         with self._lock:
@@ -398,11 +399,8 @@ class _CoverageExtension(SchemaExtension):
         return _next(root, info, *args, **kwargs)
 
     def on_execute(self) -> Iterator[None]:
-        if (
-            not self._controller.supports_subscriptions
-            and self.execution_context.operation_type is OperationType.SUBSCRIPTION
-        ):
-            self._controller.record_unsupported_subscription()
+        if self.execution_context.operation_type is OperationType.SUBSCRIPTION:
+            self._controller.record_subscription()
         yield None
 
 

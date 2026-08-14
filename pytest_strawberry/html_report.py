@@ -75,16 +75,6 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.eyebrow {
-  margin: 0 0 0.375rem;
-  color: var(--accent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 h1,
 h2,
 h3,
@@ -532,13 +522,7 @@ def write_html_report(
 
 
 def _render_page(report: CoverageReport, controller: CoverageController) -> str:
-    tone = _coverage_tone(report.percentage)
     mode = "All fields" if controller.mode == "all" else "Resolvers only"
-    subscription_status = (
-        "Subscriptions included"
-        if controller.supports_subscriptions
-        else "Subscriptions excluded"
-    )
     schemas = "\n".join(
         _render_schema(schema, position)
         for position, schema in enumerate(report.schemas, start=1)
@@ -565,6 +549,19 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     notices = _render_notices(report, controller)
     schema_count = len(report.schemas)
     schema_label = _plural(schema_count, "schema")
+    metadata = [mode, f"graphql-core {escape(controller.graphql_version)}"]
+    if controller.subscription_executed():
+        metadata.append(
+            "subscriptions included"
+            if controller.supports_subscriptions
+            else "subscriptions excluded"
+        )
+    metadata.extend(
+        [
+            f"{report.hit_count}/{report.field_count} fields covered",
+            f"{schema_count} {schema_label}",
+        ]
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -576,17 +573,9 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
   </head>
   <body>
     <main class="page">
-      <header class="report-header" data-tone="{tone}">
-        <p class="eyebrow">pytest-strawberry</p>
-        <h1>
-          Strawberry coverage:
-          <span class="type-percentage">{report.percentage:.2f}%</span>
-        </h1>
-        <p class="metadata">
-          {mode}, graphql-core {escape(controller.graphql_version)},
-          {subscription_status.lower()}, {report.hit_count}/{report.field_count}
-          fields covered, {schema_count} {schema_label}
-        </p>
+      <header class="report-header">
+        <h1>Strawberry coverage</h1>
+        <p class="metadata">{", ".join(metadata)}</p>
       </header>
 
       {notices}
@@ -710,7 +699,7 @@ def _render_type(
     )
     type_id = f"schema-{schema_fingerprint}-type-{position}"
     return f"""
-              <details class="type">
+              <details class="type" open>
                 <summary
                   class="type-summary-row"
                   id="{type_id}"
