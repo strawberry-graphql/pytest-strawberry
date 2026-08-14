@@ -22,7 +22,10 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 requires-python = ">=3.10,<4.0"
-dependencies = ["pytest>=8.0,<10.0"]
+dependencies = [
+  "pytest>=8.0,<10.0",
+  "strawberry-graphql>=0.316.0",
+]
 
 [project.urls]
 repository = "https://github.com/strawberry-graphql/pytest-strawberry"
@@ -35,6 +38,7 @@ pytest-strawberry = "pytest_strawberry.plugin"
 dev = [
   "mypy>=1.15.0,<3.0.0",
   "pre-commit>=4.0.0,<5.0.0",
+  "pytest-xdist>=3.6.0,<4.0.0",
   "ruff>=0.14.1,<0.17.0",
 ]
 
