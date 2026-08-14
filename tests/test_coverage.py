@@ -135,6 +135,85 @@ def test_report_uses_python_names_and_shows_explicit_graphql_aliases(
     assert "displayName" not in output
 
 
+def test_html_report_is_self_contained_and_uses_python_names(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type(name="User")
+        class UserModel:
+            @strawberry.field
+            def display_name(self) -> str:
+                return "Ada"
+
+            @strawberry.field(name="email")
+            def email_address(self) -> str:
+                return "ada@example.com"
+
+        @strawberry.type(name="Query")
+        class QueryRoot:
+            @strawberry.field
+            def viewer(self) -> UserModel:
+                return UserModel()
+
+        schema = strawberry.Schema(query=QueryRoot)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ viewer { displayName } }")
+            assert result.data == {"viewer": {"displayName": "Ada"}}
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=reports/strawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*HTML report: reports/strawberry/index.html*"])
+    html = (pytester.path / "reports" / "strawberry" / "index.html").read_text()
+    assert "<!doctype html>" in html
+    assert "<style>" in html
+    assert "<script" not in html
+    assert "prefers-color-scheme: dark" in html
+    assert "66.67%" in html
+    assert "QueryRoot [Query]" in html
+    assert "UserModel [User]" in html
+    assert "email_address [email]" in html
+    assert "Resolvers only" in html
+
+
+def test_html_report_write_failure_fails_the_run(pytester: pytest.Pytester) -> None:
+    pytester.makepyfile("def test_passes(): pass")
+    report_directory = pytester.path / "not-a-directory"
+    report_directory.write_text("file")
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        f"--strawberry-coverage-html={report_directory}",
+        "-q",
+    )
+
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*HTML report: failed to write*"])
+
+
+def test_html_report_rejects_an_empty_directory(pytester: pytest.Pytester) -> None:
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=",
+        "-q",
+    )
+
+    assert result.ret == pytest.ExitCode.USAGE_ERROR
+    result.stderr.fnmatch_lines(["*must be a non-empty directory*"])
+    assert not (pytester.path / "index.html").exists()
+
+
 def test_report_wraps_long_missing_fields_to_the_terminal_width(
     pytester: pytest.Pytester,
     monkeypatch: pytest.MonkeyPatch,
@@ -463,6 +542,7 @@ def test_fail_under_fails_an_otherwise_passing_run(pytester: pytest.Pytester) ->
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=1",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
@@ -475,6 +555,8 @@ def test_fail_under_fails_an_otherwise_passing_run(pytester: pytest.Pytester) ->
             "*Coverage threshold: not met (0.00% < 1.00%)*",
         ]
     )
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert "Coverage threshold not met." in html
 
 
 @pytest.mark.parametrize(
@@ -526,6 +608,7 @@ def test_fail_under_uses_the_displayed_two_decimal_percentage(
     [
         "--strawberry-coverage-mode=all",
         "--strawberry-coverage-fail-under=50",
+        "--strawberry-coverage-html=htmlstrawberry",
     ],
 )
 def test_coverage_options_require_enable_flag(
@@ -733,12 +816,14 @@ def test_collect_only_suppresses_reporting_and_gating(
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=100",
+        "--strawberry-coverage-html=htmlstrawberry",
         "--collect-only",
         "-q",
     )
 
     assert result.ret == pytest.ExitCode.OK
     assert "Strawberry coverage" not in result.stdout.str()
+    assert not (pytester.path / "htmlstrawberry").exists()
 
 
 def test_plugin_is_inert_without_enable_flag(pytester: pytest.Pytester) -> None:
@@ -804,8 +889,12 @@ def test_xdist_workers_merge_complementary_coverage(
         "-n2",
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=100",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
     result.assert_outcomes(passed=2)
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert "100.00%" in html
+    assert "2 covered" in html

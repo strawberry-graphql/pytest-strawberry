@@ -68,7 +68,21 @@ pytest --strawberry-coverage --strawberry-coverage-fail-under=90
 ```
 
 The threshold is compared with the displayed percentage rounded to two decimal
-places. Mode and threshold options require `--strawberry-coverage`.
+places. Mode, threshold, and HTML options require `--strawberry-coverage`.
+
+### HTML report
+
+Write the same coverage data to a self-contained HTML report:
+
+```shell
+pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
+```
+
+Open `htmlstrawberry/index.html` in a browser. The responsive report uses
+Python-first names, highlights missing fields, follows the operating system's
+light or dark appearance, and includes all styles without external assets. A
+custom output directory can be passed after `=`. The terminal report remains
+enabled.
 
 Schema executions with different eligible fields or Python mappings receive
 separate fingerprinted tables. Executions with the same field set are combined.
