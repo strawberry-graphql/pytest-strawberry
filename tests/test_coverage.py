@@ -4,6 +4,7 @@ import graphql
 import pytest
 
 _DISTINCT_SCHEMA_COUNT = 2
+_TERMINAL_WIDTH = 72
 
 
 def test_resolver_coverage_is_the_default(pytester: pytest.Pytester) -> None:
@@ -97,7 +98,7 @@ def test_report_wraps_long_missing_fields_to_the_terminal_width(
     pytester: pytest.Pytester,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("COLUMNS", "72")
+    monkeypatch.setenv("COLUMNS", str(_TERMINAL_WIDTH))
     pytester.makepyfile(
         """
         import strawberry
@@ -108,8 +109,10 @@ def test_report_wraps_long_missing_fields_to_the_terminal_width(
             def covered(self) -> str:
                 return "covered"
 
-            @strawberry.field
-            def this_is_a_very_long_uncovered_graphql_field_name_that_wraps(self) -> str:
+            @strawberry.field(
+                name="thisIsAVeryLongUncoveredGraphqlFieldNameThatWraps"
+            )
+            def uncovered(self) -> str:
                 return "missing"
 
         schema = strawberry.Schema(query=Query)
@@ -129,7 +132,7 @@ def test_report_wraps_long_missing_fields_to_the_terminal_width(
         if line.startswith(("┌", "│", "├", "└"))
     ]
     assert table_lines
-    assert all(len(line) <= 72 for line in table_lines)
+    assert all(len(line) <= _TERMINAL_WIDTH for line in table_lines)
 
 
 def test_only_invoked_fields_count_and_raised_resolvers_count(
