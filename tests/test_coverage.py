@@ -182,7 +182,11 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "66.67%" in html
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
-    assert "email_address [email]" in html
+    assert '<table class="field-table">' in html
+    assert '<ul class="field-list"' not in html
+    assert 'aria-label="viewer, covered"' in html
+    assert 'aria-label="display_name, covered"' in html
+    assert 'aria-label="email_address [email], missing"' in html
     assert "Resolvers only" in html
 
 

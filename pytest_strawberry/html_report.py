@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from pytest_strawberry.coverage import (
         CoverageController,
         CoverageReport,
+        FieldCoverage,
         SchemaCoverage,
         TypeCoverage,
     )
@@ -94,13 +95,15 @@ body {
 h1,
 h2,
 h3,
+h4,
 p {
   margin-top: 0;
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   color: var(--text);
   font-weight: 600;
   text-wrap: balance;
@@ -361,104 +364,94 @@ h3 {
   font-weight: 400;
 }
 
-.table-scroll {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  outline: none;
+.type-list {
+  border-top: 1px solid var(--border);
 }
 
-.table-scroll:focus-visible {
-  border-radius: 0.5rem;
-  outline: 2px solid var(--accent);
-  outline-offset: 0.25rem;
-}
-
-table {
-  width: 100%;
-  min-width: 43rem;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th,
-td {
-  padding: 0.875rem 1rem;
+.type {
+  padding-block: 1.5rem;
   border-bottom: 1px solid var(--border);
 }
 
-th:first-child,
-td:first-child {
-  padding-left: 0;
+.type-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-th:last-child,
-td:last-child {
-  padding-right: 0;
-}
-
-th {
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-td {
-  color: var(--text);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  vertical-align: top;
+.type-heading {
+  min-width: 0;
 }
 
 .type-name {
+  margin-bottom: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 500;
-  white-space: nowrap;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
-.number,
-.percentage {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.number {
-  text-align: right;
-}
-
-.percentage {
-  color: var(--tone);
-  font-weight: 600;
-  text-align: right;
-}
-
-.missing-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-
-.missing-field {
-  padding: 0.1875rem 0.4375rem;
-  border: 1px solid var(--border);
-  border-radius: 0.375rem;
-  background: var(--surface);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.8125rem;
-  white-space: nowrap;
-}
-
-.all-covered {
+.type-summary {
+  margin: 0.375rem 0 0;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
-tfoot td {
-  padding-top: 1rem;
-  border-bottom: 0;
+.type-score {
+  flex: 0 0 auto;
+  color: var(--tone);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.field-table {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.field-row {
+  --field-tone: var(--high);
+  --field-background: var(--high-soft);
+}
+
+.field-row[data-status="missing"] {
+  --field-tone: var(--low);
+  --field-background: var(--low-soft);
+}
+
+.field-row > * {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--field-background);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.field-row:first-child > * {
+  border-top: 0;
+}
+
+.field-name-cell {
+  box-shadow: inset 0.1875rem 0 var(--field-tone);
+  color: var(--text);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.field-name-cell code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.field-state-cell {
+  width: 7rem;
+  color: var(--field-tone);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -533,6 +526,14 @@ tfoot td {
     margin-top: 0;
     text-align: right;
   }
+
+  .type-summary {
+    font-size: 0.875rem;
+  }
+
+  .field-row > * {
+    font-size: 0.875rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -547,11 +548,11 @@ tfoot td {
     --accent: #fb7185;
     --accent-soft: #09090b;
     --high: #4ade80;
-    --high-soft: #09090b;
+    --high-soft: rgb(74 222 128 / 6%);
     --medium: #fbbf24;
     --medium-soft: #09090b;
     --low: #f87171;
-    --low-soft: #09090b;
+    --low-soft: rgb(248 113 113 / 7%);
   }
 
   .notice {
@@ -578,14 +579,6 @@ tfoot td {
     padding: 0;
   }
 
-  .table-scroll {
-    overflow: visible;
-  }
-
-  table {
-    min-width: 0;
-  }
-
   h1 {
     font-size: 3rem;
   }
@@ -603,7 +596,8 @@ tfoot td {
   }
 
   .schema-header,
-  tr,
+  .type-header,
+  .field-row,
   .report-footer {
     break-inside: avoid;
   }
@@ -644,7 +638,8 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
           <div class="section-heading">
             <h2 id="schema-details">Schema details</h2>
             <p class="section-description">
-              Each table represents a distinct set of eligible Strawberry fields.
+              Every eligible field is grouped under the Python type that defines
+              it.
             </p>
           </div>
           {schemas}
@@ -788,7 +783,10 @@ def _render_notices(
 
 def _render_schema(schema: SchemaCoverage, position: int) -> str:
     tone = _coverage_tone(schema.percentage)
-    rows = "\n".join(_render_type_row(type_report) for type_report in schema.types)
+    types = "\n".join(
+        _render_type(type_report, schema.fingerprint, type_position)
+        for type_position, type_report in enumerate(schema.types, start=1)
+    )
     return f"""
           <article class="schema" aria-labelledby="schema-{schema.fingerprint}">
             <header class="schema-header">
@@ -806,67 +804,72 @@ def _render_schema(schema: SchemaCoverage, position: int) -> str:
                 </small>
               </div>
             </header>
-            <div
-              class="table-scroll"
-              tabindex="0"
-              aria-label="Coverage for schema {schema.fingerprint}"
-            >
-              <table>
-                <caption class="sr-only">
-                  Field coverage for schema {schema.fingerprint}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Python type</th>
-                    <th scope="col" class="number">Fields</th>
-                    <th scope="col" class="number">Miss</th>
-                    <th scope="col" class="number">Coverage</th>
-                    <th scope="col">Missing fields</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td>All types</td>
-                    <td class="number">{schema.field_count}</td>
-                    <td class="number">{schema.missing_count}</td>
-                    <td class="percentage" data-tone="{tone}">
-                      {schema.percentage:.2f}%
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
+            <div class="type-list">
+              {types}
             </div>
           </article>
 """
 
 
-def _render_type_row(type_report: TypeCoverage) -> str:
+def _render_type(
+    type_report: TypeCoverage,
+    schema_fingerprint: str,
+    position: int,
+) -> str:
     missing = len(type_report.missing)
     tone = _coverage_tone(type_report.percentage)
-    missing_fields = (
-        '<span class="all-covered">All covered</span>'
-        if not type_report.missing
-        else "".join(
-            f'<code class="missing-field">{escape(field_name)}</code>'
-            for field_name in type_report.missing
-        )
+    fields = "\n".join(
+        _render_field(field_report) for field_report in type_report.fields
     )
+    type_id = f"schema-{schema_fingerprint}-type-{position}"
     return f"""
-                  <tr>
-                    <td class="type-name">{escape(type_report.name)}</td>
-                    <td class="number">{type_report.field_count}</td>
-                    <td class="number">{missing}</td>
-                    <td class="percentage" data-tone="{tone}">
-                      {type_report.percentage:.2f}%
-                    </td>
-                    <td>
-                      <div class="missing-fields">{missing_fields}</div>
-                    </td>
-                  </tr>"""
+              <section class="type" aria-labelledby="{type_id}">
+                <header class="type-header">
+                  <div class="type-heading">
+                    <h4 class="type-name" id="{type_id}">
+                      {escape(type_report.name)}
+                    </h4>
+                    <p class="type-summary">
+                      {type_report.field_count}
+                      {_plural(type_report.field_count, "field")} ·
+                      {missing} missing
+                    </p>
+                  </div>
+                  <strong class="type-score" data-tone="{tone}">
+                    {type_report.percentage:.2f}%
+                  </strong>
+                </header>
+                <table class="field-table">
+                  <caption class="sr-only">
+                    Field coverage for {escape(type_report.name)}
+                  </caption>
+                  <thead>
+                    <tr class="sr-only">
+                      <th scope="col">Field</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fields}
+                  </tbody>
+                </table>
+              </section>"""
+
+
+def _render_field(field_report: FieldCoverage) -> str:
+    status = "covered" if field_report.covered else "missing"
+    name = escape(field_report.name)
+    return f"""
+                    <tr
+                      class="field-row"
+                      data-status="{status}"
+                      aria-label="{name}, {status}"
+                    >
+                      <th class="field-name-cell" scope="row">
+                        <code>{name}</code>
+                      </th>
+                      <td class="field-state-cell">{status.title()}</td>
+                    </tr>"""
 
 
 def _coverage_tone(percentage: float) -> CoverageTone:

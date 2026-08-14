@@ -108,12 +108,29 @@ class _FieldSetCoverage:
 
 
 @dataclass(frozen=True)
+class FieldCoverage:
+    """Coverage status for one Python-facing field."""
+
+    name: str
+    covered: bool
+
+
+@dataclass(frozen=True)
 class TypeCoverage:
     """Coverage values for one Python type backing a GraphQL object."""
 
     name: str
-    field_count: int
-    missing: tuple[str, ...]
+    fields: tuple[FieldCoverage, ...]
+
+    @property
+    def field_count(self) -> int:
+        """Return the number of eligible fields."""
+        return len(self.fields)
+
+    @property
+    def missing(self) -> tuple[str, ...]:
+        """Return uncovered field names for the terminal reporter."""
+        return tuple(field.name for field in self.fields if not field.covered)
 
     @property
     def percentage(self) -> float:
@@ -312,11 +329,12 @@ class CoverageController:
                 type_reports.append(
                     TypeCoverage(
                         name=type_name,
-                        field_count=len(ordered_fields),
-                        missing=tuple(
-                            field_definition.display_field_name
+                        fields=tuple(
+                            FieldCoverage(
+                                name=field_definition.display_field_name,
+                                covered=field_definition.coordinate in hits,
+                            )
                             for field_definition in ordered_fields
-                            if field_definition.coordinate not in hits
                         ),
                     )
                 )
