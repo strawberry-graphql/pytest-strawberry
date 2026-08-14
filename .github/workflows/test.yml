@@ -65,31 +65,11 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
-          python-version: "3.10"
+          python-version: "3.14"
 
       - run: uv sync --locked
-      - name: Test lower compatibility boundary
-        run: >-
-          uv run --locked
-          --with "strawberry-graphql==0.316.0"
-          --with "graphql-core==3.2.11"
-          pytest -vv
-      - name: Test graphql-core 3.3 subscription coverage
-        run: >-
-          uv run --locked
-          --with "graphql-core>=3.3.0rc0,<3.4"
-          pytest -vv
-      - name: Test Strawberry Django compatibility
-        run: >-
-          uv run --locked
-          --group strawberry-django-example
-          pytest -vv
-      - name: Run the Strawberry Django example
-        run: >-
-          uv run --locked
-          --group strawberry-django-example
-          pytest examples/strawberry_django -q
-          --strawberry-coverage
+      - name: Run compatibility sessions
+        run: uv run nox --tags compatibility
 
   quality:
     name: ✨ Quality

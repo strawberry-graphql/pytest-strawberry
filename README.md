@@ -112,6 +112,13 @@ uv run mypy
 uv build
 ```
 
+Run the Strawberry, graphql-core, and Strawberry Django compatibility checks
+on Python 3.14 with:
+
+```shell
+uv run nox --tags compatibility
+```
+
 ## Releases
 
 Release changes are proposed through pull requests containing a `RELEASE.md`.

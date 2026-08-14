@@ -1,12 +1,15 @@
 # Strawberry Django example
 
 This example uses an unsaved Django model instance, so it needs no database
-migrations or external services. Run it from the repository root with:
+migrations or external services. Run its dedicated compatibility session from
+the repository root with:
 
 ```shell
-uv run --group strawberry-django-example pytest examples/strawberry_django -q \
-  --strawberry-coverage
+uv run nox -s strawberry_django
 ```
+
+The session runs the plugin's test suite with Strawberry Django installed, then
+runs this example with coverage enabled.
 
 The report includes the generated Django model fields:
 
