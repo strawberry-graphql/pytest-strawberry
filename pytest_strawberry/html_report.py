@@ -40,7 +40,7 @@ _STYLE = """
   --low: #b91c1c;
   --low-soft: #fef2f2;
   --radius: 1rem;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-synthesis: none;
@@ -66,8 +66,7 @@ body {
 .page {
   isolation: isolate;
   width: 100%;
-  max-width: 68rem;
-  margin-inline: auto;
+  max-width: 90rem;
   padding: 1.5rem 1rem;
 }
 
@@ -270,14 +269,23 @@ h3 {
 .type-summary-row::before {
   position: absolute;
   left: 0.5rem;
+  top: 50%;
+  width: 0.375rem;
+  height: 0.375rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
   color: var(--text-muted);
-  content: "+";
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 600;
+  content: "";
+  transform: translateY(-60%) rotate(-45deg);
 }
 
 .type[open] > .type-summary-row::before {
-  content: "-";
+  transform: translateY(-75%) rotate(45deg);
+}
+
+.type[open] > .type-summary-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .type-summary-row:hover {
@@ -426,7 +434,7 @@ h3 {
 
 @media (min-width: 48rem) {
   .page {
-    padding: 2.5rem 1.5rem 2rem;
+    padding: 2.5rem 3rem 2rem;
   }
 
   h1 {
