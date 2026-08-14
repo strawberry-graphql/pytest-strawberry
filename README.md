@@ -24,9 +24,9 @@ Enable coverage on the pytest command line:
 pytest --strawberry-coverage
 ```
 
-By default, the report covers fields with explicit Strawberry resolvers. This
-keeps the denominator focused on application behavior rather than data-model
-attribute access:
+By default, the report covers fields with explicit Strawberry resolvers or
+custom field resolution supplied by integrations such as Strawberry Django. It
+excludes fields handled only by Strawberry's ordinary attribute lookup:
 
 ```text
 ============================= Strawberry coverage =============================
@@ -74,6 +74,10 @@ Field universes with different GraphQL coordinates or Python mappings receive
 separate fingerprinted tables; identical universes are merged. The final
 threshold uses their combined field and hit totals. Coverage from pytest-xdist
 workers is merged automatically.
+
+A runnable [Strawberry Django example](./examples/strawberry_django) shows how
+generated model fields participate in resolver coverage without adding a
+runtime dependency on Strawberry Django.
 
 ### Subscriptions
 

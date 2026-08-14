@@ -22,6 +22,7 @@ from graphql import (
 from strawberry.extensions import SchemaExtension
 from strawberry.schema.schema import Schema
 from strawberry.types.base import StrawberryObjectDefinition
+from strawberry.types.field import StrawberryField
 from strawberry.types.graphql import OperationType
 
 if TYPE_CHECKING:
@@ -443,10 +444,15 @@ def _build_field_definition(
     mode: CoverageMode,
 ) -> FieldDefinition | None:
     strawberry_field = schema.get_field_for_type(field_name, type_name)
-    if mode == "resolvers" and (
-        strawberry_field is None or strawberry_field.base_resolver is None
-    ):
-        return None
+    if mode == "resolvers":
+        if strawberry_field is None:
+            return None
+        uses_default_lookup = (
+            strawberry_field.base_resolver is None
+            and type(strawberry_field).get_result is StrawberryField.get_result
+        )
+        if uses_default_lookup:
+            return None
 
     type_definition = schema.get_type_by_name(type_name)
     python_type_name = (

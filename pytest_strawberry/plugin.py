@@ -70,7 +70,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--strawberry-coverage-mode",
         choices=("resolvers", "all"),
         default=None,
-        help="Fields to measure: explicit resolvers (default) or all fields.",
+        help="Fields to measure: resolver-backed (default) or all fields.",
     )
     group.addoption(
         "--strawberry-coverage-fail-under",

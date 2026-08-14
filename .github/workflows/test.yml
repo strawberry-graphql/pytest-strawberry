@@ -79,6 +79,17 @@ jobs:
           uv run --locked
           --with "graphql-core>=3.3.0rc0,<3.4"
           pytest -vv
+      - name: Test Strawberry Django compatibility
+        run: >-
+          uv run --locked
+          --group strawberry-django-example
+          pytest -vv
+      - name: Run the Strawberry Django example
+        run: >-
+          uv run --locked
+          --group strawberry-django-example
+          pytest examples/strawberry_django -q
+          --strawberry-coverage
 
   quality:
     name: ✨ Quality

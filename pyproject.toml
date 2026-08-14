@@ -41,6 +41,7 @@ dev = [
   "pytest-xdist>=3.6.0,<4.0.0",
   "ruff>=0.14.1,<0.17.0",
 ]
+strawberry-django-example = ["strawberry-graphql-django==0.87.0"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -82,6 +83,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"examples/**/*.py" = ["D", "INP001", "S101"]
 "tests/*" = ["D", "S101"]
 
 [build-system]
