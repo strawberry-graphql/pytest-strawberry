@@ -188,16 +188,6 @@ h3 {
   font-size: 1.125rem;
 }
 
-.schema-code {
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.375rem;
-  background: var(--surface-strong);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 1em;
-  font-weight: 500;
-}
-
 .schema-score {
   color: var(--tone);
   font-size: 1rem;
@@ -218,7 +208,7 @@ h3 {
 }
 
 .type-columns,
-.type-summary-row,
+.type-header-row,
 .type-total {
   display: grid;
   grid-template-columns: var(--type-columns);
@@ -226,7 +216,7 @@ h3 {
 }
 
 .type-columns {
-  padding: 0.5rem 0.5rem 0.375rem 1.75rem;
+  padding: 0.5rem 0.5rem 0.375rem 0.75rem;
   border-bottom: 1px solid var(--border-strong);
   color: var(--text-muted);
   font-size: 0.75rem;
@@ -235,7 +225,7 @@ h3 {
 }
 
 .type-columns > :not(:first-child),
-.type-summary-row > :not(:first-child),
+.type-header-row > :not(:first-child),
 .type-total > :not(:first-child) {
   text-align: right;
 }
@@ -244,48 +234,11 @@ h3 {
   border-bottom: 1px solid var(--border);
 }
 
-.type-summary-row {
-  position: relative;
-  padding: 0.625rem 0.5rem 0.625rem 1.75rem;
-  cursor: pointer;
-  font-size: 1rem;
-  list-style: none;
-}
-
-.type-summary-row::-webkit-details-marker {
-  display: none;
-}
-
-.type-summary-row::before {
-  position: absolute;
-  left: 0.5rem;
-  top: 50%;
-  width: 0.375rem;
-  height: 0.375rem;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  color: var(--text-muted);
-  content: "";
-  transform: translateY(-60%) rotate(-45deg);
-}
-
-.type[open] > .type-summary-row::before {
-  transform: translateY(-75%) rotate(45deg);
-}
-
-.type[open] > .type-summary-row {
+.type-header-row {
+  padding: 0.625rem 0.5rem 0.625rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-}
-
-.type-summary-row:hover {
-  background: var(--surface);
-}
-
-.type-summary-row:focus-visible {
-  z-index: 1;
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  font-size: 1rem;
 }
 
 .type-name {
@@ -317,30 +270,18 @@ h3 {
   text-align: left;
 }
 
-.field-table thead th {
-  padding: 0.375rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-style: italic;
-  font-weight: 500;
-}
-
-.field-table thead th:last-child {
-  text-align: right;
-}
-
 .field-row {
-  --field-tone: var(--high);
+  --field-background: var(--high-soft);
 }
 
 .field-row[data-status="missing"] {
-  --field-tone: var(--low);
+  --field-background: var(--low-soft);
 }
 
 .field-row > * {
   padding: 0.4375rem 0.75rem;
   border-top: 1px solid var(--border);
+  background: var(--field-background);
   font-size: 1rem;
   line-height: 1.5;
 }
@@ -350,7 +291,6 @@ h3 {
 }
 
 .field-name-cell {
-  box-shadow: inset 0.125rem 0 var(--field-tone);
   color: var(--text);
   font-weight: 400;
   overflow-wrap: anywhere;
@@ -360,16 +300,8 @@ h3 {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.field-state-cell {
-  width: 6.5rem;
-  color: var(--field-tone);
-  font-weight: 600;
-  text-align: right;
-  white-space: nowrap;
-}
-
 .type-total {
-  padding: 0.625rem 0.5rem 0.625rem 1.75rem;
+  padding: 0.625rem 0.5rem 0.625rem 0.75rem;
   border-bottom: 1px solid var(--border-strong);
   font-size: 1rem;
   font-weight: 600;
@@ -439,7 +371,7 @@ h3 {
     --type-columns: minmax(0, 1fr) 5.5rem 4rem 4rem;
   }
 
-  .type-summary-row,
+  .type-header-row,
   .type-total {
     font-size: 0.875rem;
   }
@@ -492,12 +424,8 @@ h3 {
     padding: 0;
   }
 
-  .type:not([open]) > .type-details {
-    display: block !important;
-  }
-
   .schema-header,
-  .type-summary-row,
+  .type-header-row,
   .field-row,
   .report-footer {
     break-inside: avoid;
@@ -651,7 +579,6 @@ def _render_schema(schema: SchemaCoverage, position: int) -> str:
               <div>
                 <h2 class="schema-identity" id="schema-{schema.fingerprint}">
                   Schema {position}
-                  <code class="schema-code">{schema.fingerprint}</code>
                 </h2>
                 <p class="schema-count">
                   {schema.hit_count}/{schema.field_count} covered ·
@@ -699,9 +626,9 @@ def _render_type(
     )
     type_id = f"schema-{schema_fingerprint}-type-{position}"
     return f"""
-              <details class="type" open>
-                <summary
-                  class="type-summary-row"
+              <section class="type" aria-labelledby="{type_id}">
+                <header
+                  class="type-header-row"
                   id="{type_id}"
                   aria-label="{escape(type_report.name)},
                     {type_report.percentage:.2f}% coverage,
@@ -713,24 +640,18 @@ def _render_type(
                   </strong>
                   <span class="type-number">{type_report.field_count}</span>
                   <span class="type-number">{missing}</span>
-                </summary>
+                </header>
                 <div class="type-details">
                   <table class="field-table">
                     <caption class="sr-only">
                       Field coverage for {escape(type_report.name)}
                     </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Python field</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
                     <tbody>
                       {fields}
                     </tbody>
                   </table>
                 </div>
-              </details>"""
+              </section>"""
 
 
 def _render_field(field_report: FieldCoverage) -> str:
@@ -745,7 +666,6 @@ def _render_field(field_report: FieldCoverage) -> str:
                       <th class="field-name-cell" scope="row">
                         <code>{name}</code>
                       </th>
-                      <td class="field-state-cell">{status.title()}</td>
                     </tr>"""
 
 

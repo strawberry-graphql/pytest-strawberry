@@ -79,11 +79,11 @@ pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
 ```
 
 Open `htmlstrawberry/index.html` in a browser. The responsive report uses
-Python-first names and a compact type index. Each type is expanded by default,
-showing every eligible field marked as covered or missing; select its heading to
-collapse or reopen it. The report follows the operating system's light or dark
-appearance and includes all styles without external assets. A custom output
-directory can be passed after `=`. The terminal report remains enabled.
+Python-first names and groups every eligible field under its type. Soft green
+and red rows distinguish covered and missing fields. The report follows the
+operating system's light or dark appearance and includes all styles without
+external assets. A custom output directory can be passed after `=`. The terminal
+report remains enabled.
 
 Schema executions with different eligible fields or Python mappings receive
 separate fingerprinted tables. Executions with the same field set are combined.

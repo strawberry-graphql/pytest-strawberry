@@ -186,10 +186,15 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
     assert '<div class="type-columns" aria-hidden="true">' in html
-    assert '<details class="type" open>' in html
-    assert 'class="type-summary-row"' in html
+    assert '<section class="type"' in html
+    assert "<details" not in html
+    assert 'class="schema-code"' not in html
+    assert 'class="type-header-row"' in html
     assert '<table class="field-table">' in html
-    assert '<th scope="col">Python field</th>' in html
+    assert "Python field" not in html
+    assert 'class="field-state-cell"' not in html
+    assert ">Covered<" not in html
+    assert ">Missing<" not in html
     assert '<ul class="field-list"' not in html
     assert 'aria-label="viewer, covered"' in html
     assert 'aria-label="display_name, covered"' in html
