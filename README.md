@@ -70,10 +70,10 @@ pytest --strawberry-coverage --strawberry-coverage-fail-under=90
 The threshold is compared with the displayed percentage rounded to two decimal
 places. Mode and threshold options require `--strawberry-coverage`.
 
-Field universes with different GraphQL coordinates or Python mappings receive
-separate fingerprinted tables; identical universes are merged. The final
-threshold uses their combined field and hit totals. Coverage from pytest-xdist
-workers is merged automatically.
+Schema executions with different eligible fields or Python mappings receive
+separate fingerprinted tables. Executions with the same field set are combined.
+The final threshold uses their combined field and hit totals. Coverage from
+pytest-xdist workers is merged automatically.
 
 A runnable [Strawberry Django example](./examples/strawberry_django) shows how
 generated model fields participate in resolver coverage without adding a

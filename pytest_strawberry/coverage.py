@@ -63,7 +63,7 @@ class FieldDefinition:
         return f"{self.python_field_name} [{alias}]"
 
 
-UniverseKey = tuple[FieldDefinition, ...]
+FieldSet = tuple[FieldDefinition, ...]
 
 
 class _GetExtensions(Protocol):
@@ -82,7 +82,7 @@ class _SerializedField(TypedDict):
     explicit_graphql_field_name: str | None
 
 
-class _SerializedUniverse(TypedDict):
+class _SerializedFieldSet(TypedDict):
     fields: list[_SerializedField]
     hits: list[list[str]]
 
@@ -90,18 +90,18 @@ class _SerializedUniverse(TypedDict):
 class CoverageSnapshot(TypedDict):
     """JSON-serializable xdist worker output."""
 
-    universes: list[_SerializedUniverse]
+    field_sets: list[_SerializedFieldSet]
     unsupported_subscription_executed: bool
 
 
 @dataclass
-class _Universe:
-    fields: UniverseKey
+class _FieldSetCoverage:
+    fields: FieldSet
     hits: set[Coordinate] = field(default_factory=set)
     coordinates: frozenset[Coordinate] = field(init=False)
 
     def __post_init__(self) -> None:
-        """Cache the GraphQL coordinates checked for every resolver call."""
+        """Cache coordinates checked for every resolver call."""
         self.coordinates = frozenset(
             field_definition.coordinate for field_definition in self.fields
         )
@@ -112,22 +112,22 @@ class TypeCoverage:
     """Coverage values for one Python type backing a GraphQL object."""
 
     name: str
-    fields: tuple[str, ...]
+    field_count: int
     missing: tuple[str, ...]
 
     @property
     def percentage(self) -> float:
         """Return this type's rounded field coverage percentage."""
         return _percentage(
-            len(self.fields),
-            len(self.fields) - len(self.missing),
+            self.field_count,
+            self.field_count - len(self.missing),
             observed_schema=True,
         )
 
 
 @dataclass(frozen=True)
 class SchemaCoverage:
-    """Coverage values for one distinct field universe."""
+    """Coverage values for one distinct field set."""
 
     fingerprint: str
     types: tuple[TypeCoverage, ...]
@@ -154,11 +154,6 @@ class CoverageReport:
     hit_count: int
 
     @property
-    def observed_schema(self) -> bool:
-        """Return whether at least one schema universe was observed."""
-        return bool(self.schemas)
-
-    @property
     def missing_count(self) -> int:
         """Return the combined number of uncovered fields."""
         return self.field_count - self.hit_count
@@ -169,7 +164,7 @@ class CoverageReport:
         return _percentage(
             self.field_count,
             self.hit_count,
-            observed_schema=self.observed_schema,
+            observed_schema=bool(self.schemas),
         )
 
 
@@ -189,10 +184,10 @@ class CoverageController:
         self.missing_worker_output = False
 
         self._lock = Lock()
-        self._schema_universes: WeakKeyDictionary[Schema, UniverseKey] = (
+        self._schema_field_sets: WeakKeyDictionary[Schema, FieldSet] = (
             WeakKeyDictionary()
         )
-        self._universes: dict[UniverseKey, _Universe] = {}
+        self._field_sets: dict[FieldSet, _FieldSetCoverage] = {}
         self._unsupported_subscription_executed = False
         self._original_get_extensions: _GetExtensions | None = None
         self._instrumented_get_extensions: _GetExtensions | None = None
@@ -209,9 +204,9 @@ class CoverageController:
             schema: Schema,
             sync: bool = False,  # noqa: FBT001, FBT002
         ) -> list[SchemaExtension]:
-            universe = controller._observe_schema(schema)
+            field_set = controller._observe_schema(schema)
             extensions = original(schema, sync=sync)
-            return [_CoverageExtension(controller, universe), *extensions]
+            return [_CoverageExtension(controller, field_set), *extensions]
 
         self._original_get_extensions = original
         self._instrumented_get_extensions = instrumented_get_extensions
@@ -228,10 +223,10 @@ class CoverageController:
         self._original_get_extensions = None
         self._instrumented_get_extensions = None
 
-    def record(self, universe: UniverseKey, coordinate: Coordinate) -> None:
+    def record(self, field_set: FieldSet, coordinate: Coordinate) -> None:
         """Record one eligible field immediately before its resolver is invoked."""
         with self._lock:
-            data = self._universes[universe]
+            data = self._field_sets[field_set]
             if coordinate in data.coordinates:
                 data.hits.add(coordinate)
 
@@ -247,8 +242,8 @@ class CoverageController:
     def snapshot(self) -> CoverageSnapshot:
         """Return JSON-serializable data for an xdist controller."""
         with self._lock:
-            universes = [
-                _SerializedUniverse(
+            field_sets = [
+                _SerializedFieldSet(
                     fields=[
                         _SerializedField(
                             graphql_type_name=field_definition.graphql_type_name,
@@ -263,10 +258,10 @@ class CoverageController:
                     ],
                     hits=[list(coordinate) for coordinate in sorted(data.hits)],
                 )
-                for key, data in sorted(self._universes.items())
+                for key, data in sorted(self._field_sets.items())
             ]
             return CoverageSnapshot(
-                universes=universes,
+                field_sets=field_sets,
                 unsupported_subscription_executed=(
                     self._unsupported_subscription_executed
                 ),
@@ -275,16 +270,18 @@ class CoverageController:
     def merge(self, snapshot: CoverageSnapshot) -> None:
         """Merge one xdist worker snapshot."""
         with self._lock:
-            for serialized in snapshot["universes"]:
+            for serialized in snapshot["field_sets"]:
                 fields = tuple(
                     FieldDefinition(**serialized_field)
                     for serialized_field in serialized["fields"]
                 )
-                universe = self._universes.setdefault(fields, _Universe(fields))
-                universe.hits.update(
+                coverage = self._field_sets.setdefault(
+                    fields, _FieldSetCoverage(fields)
+                )
+                coverage.hits.update(
                     (type_name, field_name)
                     for type_name, field_name in serialized["hits"]
-                    if (type_name, field_name) in universe.coordinates
+                    if (type_name, field_name) in coverage.coordinates
                 )
             self._unsupported_subscription_executed |= snapshot[
                 "unsupported_subscription_executed"
@@ -293,13 +290,13 @@ class CoverageController:
     def report(self) -> CoverageReport:
         """Calculate immutable coverage values from the current aggregate."""
         with self._lock:
-            universes = tuple(
+            field_sets = tuple(
                 (key, frozenset(data.hits))
-                for key, data in sorted(self._universes.items())
+                for key, data in sorted(self._field_sets.items())
             )
 
         schemas: list[SchemaCoverage] = []
-        for fields, hits in universes:
+        for fields, hits in field_sets:
             type_fields: dict[str, list[FieldDefinition]] = {}
             for field_definition in fields:
                 type_fields.setdefault(field_definition.display_type_name, []).append(
@@ -315,10 +312,7 @@ class CoverageController:
                 type_reports.append(
                     TypeCoverage(
                         name=type_name,
-                        fields=tuple(
-                            field_definition.display_field_name
-                            for field_definition in ordered_fields
-                        ),
+                        field_count=len(ordered_fields),
                         missing=tuple(
                             field_definition.display_field_name
                             for field_definition in ordered_fields
@@ -350,9 +344,9 @@ class CoverageController:
         with self._lock:
             return self._unsupported_subscription_executed
 
-    def _observe_schema(self, schema: Schema) -> UniverseKey:
+    def _observe_schema(self, schema: Schema) -> FieldSet:
         with self._lock:
-            existing = self._schema_universes.get(schema)
+            existing = self._schema_field_sets.get(schema)
         if existing is not None:
             return existing
 
@@ -362,15 +356,15 @@ class CoverageController:
             include_subscriptions=self.supports_subscriptions,
         )
         with self._lock:
-            self._schema_universes[schema] = fields
-            self._universes.setdefault(fields, _Universe(fields))
+            self._schema_field_sets[schema] = fields
+            self._field_sets.setdefault(fields, _FieldSetCoverage(fields))
         return fields
 
 
 class _CoverageExtension(SchemaExtension):
-    def __init__(self, controller: CoverageController, universe: UniverseKey) -> None:
+    def __init__(self, controller: CoverageController, field_set: FieldSet) -> None:
         self._controller = controller
-        self._universe = universe
+        self._field_set = field_set
 
     def resolve(
         self,
@@ -381,7 +375,7 @@ class _CoverageExtension(SchemaExtension):
         **kwargs: object,
     ) -> object | Awaitable[object]:
         self._controller.record(
-            self._universe, (info.parent_type.name, info.field_name)
+            self._field_set, (info.parent_type.name, info.field_name)
         )
         return _next(root, info, *args, **kwargs)
 
@@ -396,7 +390,7 @@ class _CoverageExtension(SchemaExtension):
 
 def _build_fields(
     schema: Schema, *, mode: CoverageMode, include_subscriptions: bool
-) -> UniverseKey:
+) -> FieldSet:
     document_schema = build_ast_schema(
         parse(schema.as_str()),
         assume_valid_sdl=True,
@@ -481,7 +475,7 @@ def _percentage(field_count: int, hit_count: int, *, observed_schema: bool) -> f
     return round(hit_count / field_count * 100, 2)
 
 
-def _fingerprint(fields: UniverseKey) -> str:
+def _fingerprint(fields: FieldSet) -> str:
     value = "\0".join(
         ":".join(
             (

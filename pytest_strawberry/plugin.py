@@ -49,11 +49,7 @@ class _CoverageRow:
 _state = _PluginState()
 
 
-class _WorkerConfig(Protocol):
-    workeroutput: dict[str, object]
-
-
-class _WorkerNode(Protocol):
+class _Worker(Protocol):
     workeroutput: dict[str, object]
 
 
@@ -114,7 +110,7 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
     controller = _state.controller
     if controller is None or not _is_worker(session.config):
         return
-    worker_config = cast("_WorkerConfig", session.config)
+    worker_config = cast("_Worker", session.config)
     worker_config.workeroutput[_WORKER_OUTPUT_KEY] = controller.snapshot()
 
 
@@ -124,7 +120,7 @@ def pytest_testnodedown(node: object) -> None:
     controller = _state.controller
     if controller is None:
         return
-    worker_node = cast("_WorkerNode", node)
+    worker_node = cast("_Worker", node)
     snapshot = worker_node.workeroutput.get(_WORKER_OUTPUT_KEY)
     if snapshot is None:
         controller.mark_missing_worker_output()
@@ -288,7 +284,7 @@ def _write_schema_report(
             terminalreporter,
             _CoverageRow(
                 name=type_report.name,
-                field_count=len(type_report.fields),
+                field_count=type_report.field_count,
                 missing_count=len(type_report.missing),
                 percentage=type_report.percentage,
                 missing_fields=type_report.missing,

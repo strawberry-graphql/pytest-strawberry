@@ -615,7 +615,7 @@ def test_distinct_schemas_get_separate_tables(pytester: pytest.Pytester) -> None
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
 
 
-def test_python_metadata_keeps_identical_graphql_universes_separate(
+def test_python_metadata_keeps_identical_graphql_field_sets_separate(
     pytester: pytest.Pytester,
 ) -> None:
     pytester.makepyfile(
