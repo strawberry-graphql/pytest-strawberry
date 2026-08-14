@@ -1,6 +1,6 @@
 [project]
 name = "pytest-strawberry"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pytest plugin for Strawberry GraphQL"
 authors = [{ name = "Patrick Arminio", email = "patrick.arminio@gmail.com" }]
 license = "MIT"
