@@ -209,14 +209,20 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert excluded_control is not None
     assert "checked" not in excluded_control.group("attributes")
     assert 'data-fully-covered="true"' in html
-    assert 'data-status="excluded"' in html
+    assert all(
+        marker in html
+        for marker in (
+            'data-status="excluded"',
+            "--excluded-soft: #f5f5ed;",
+            '.field-row[data-status="excluded"] {',
+        )
+    )
     assert '<div class="type-columns" aria-hidden="true">' in html
     assert "<details" not in html
     assert 'class="type-header-row"' in html
     assert '<table class="field-table">' in html
     assert 'class="field-resolution"' not in html
-    assert "Python type" not in html
-    assert "Python field" not in html
+    assert not any(label in html for label in ("Python type", "Python field"))
     assert ">Covered<" not in html
     assert ">Missing<" not in html
     assert 'aria-label="viewer, covered"' in html
@@ -226,6 +232,7 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert '<td class="field-status-cell">missing</td>' in html
     assert '<td class="field-status-cell">not counted</td>' in html
     assert html.count('<td class="field-status-cell"></td>') == _COVERED_FIELD_COUNT
+    assert "--high-soft: #dcfce7;" in html
     assert 'class="summary-score" data-tone="medium"' in html
     assert "2/3 fields covered" in html
     assert 'class="schema-identity"' not in html
