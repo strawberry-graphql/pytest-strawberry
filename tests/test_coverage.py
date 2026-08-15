@@ -4,6 +4,7 @@ import graphql
 import pytest
 
 _DISTINCT_SCHEMA_COUNT = 2
+_NON_OBVIOUS_RESOLUTION_COUNT = 4
 _TERMINAL_WIDTH = 72
 
 
@@ -191,6 +192,7 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert 'class="schema-code"' not in html
     assert 'class="type-header-row"' in html
     assert '<table class="field-table">' in html
+    assert 'class="field-resolution"' not in html
     assert "Python type" not in html
     assert "Python field" not in html
     assert 'class="type-details"' not in html
@@ -218,6 +220,69 @@ def test_html_report_write_failure_fails_the_run(pytester: pytest.Pytester) -> N
     assert result.ret == pytest.ExitCode.TESTS_FAILED
     result.assert_outcomes(passed=1)
     result.stdout.fnmatch_lines(["*HTML report: failed to write*"])
+
+
+def test_html_report_identifies_non_obvious_field_resolution(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+        from strawberry.extensions import FieldExtension
+
+        def external_resolver() -> str:
+            return "external"
+
+        def make_resolver(value: str):
+            def resolver() -> str:
+                return value
+
+            return resolver
+
+        class AuditExtension(FieldExtension):
+            def resolve(self, next_, source, info, **kwargs):
+                return next_(source, info, **kwargs)
+
+        @strawberry.type
+        class Query:
+            @strawberry.field
+            def inline(self) -> str:
+                return "inline"
+
+            external: str = strawberry.field(resolver=external_resolver)
+            generated: str = strawberry.field(resolver=make_resolver("generated"))
+            anonymous: str = strawberry.field(resolver=lambda: "anonymous")
+            extended: str = strawberry.field(
+                resolver=external_resolver,
+                extensions=[AuditExtension()],
+            )
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync(
+                "{ inline external generated anonymous extended }"
+            )
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    report_directory = pytester.path / "htmlstrawberry"
+    html = (report_directory / "index.html").read_text()
+    assert 'aria-label="inline, covered"' in html
+    assert "via external_resolver" in html
+    assert "via make_resolver(...)" in html
+    assert "via lambda" in html
+    assert "via external_resolver · AuditExtension" in html
+    assert html.count('class="field-resolution"') == _NON_OBVIOUS_RESOLUTION_COUNT
+    assert not list(report_directory.glob("source-*.html"))
 
 
 def test_html_report_rejects_an_empty_directory(pytester: pytest.Pytester) -> None:
@@ -881,11 +946,12 @@ def test_xdist_workers_merge_complementary_coverage(
         """
         import strawberry
 
+        def resolve_one() -> str:
+            return "one"
+
         @strawberry.type
         class Query:
-            @strawberry.field
-            def one(self) -> str:
-                return "one"
+            one: str = strawberry.field(resolver=resolve_one)
 
             @strawberry.field
             def two(self) -> str:
@@ -922,3 +988,4 @@ def test_xdist_workers_merge_complementary_coverage(
     html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
     assert "100.00%" in html
     assert "2 covered" in html
+    assert "via resolve_one" in html

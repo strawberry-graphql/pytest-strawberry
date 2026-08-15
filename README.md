@@ -80,10 +80,14 @@ pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
 
 Open `htmlstrawberry/index.html` in a browser. The responsive report uses
 Python-first names and groups every eligible field under its type. Soft green
-and red rows distinguish covered and missing fields. The report follows the
-operating system's light or dark appearance and includes all styles without
-external assets. A custom output directory can be passed after `=`. The terminal
-report remains enabled.
+and red rows distinguish covered and missing fields. Fields wired through an
+external resolver, resolver factory, lambda, or user-defined field extension
+include a compact `via ...` hint. Ordinary inline methods and framework-generated
+fields remain unannotated, keeping the report focused on wiring that may not
+be obvious from Python source coverage. The report follows the operating
+system's light or dark appearance and includes all styles without external
+assets. A custom output directory can be passed after `=`. The terminal report
+remains enabled.
 
 Schema executions with different eligible fields or Python mappings receive
 separate fingerprinted tables. Executions with the same field set are combined.

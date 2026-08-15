@@ -292,6 +292,24 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.field-content {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.field-resolution {
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
 .field-name-cell code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -374,6 +392,10 @@ h3 {
 
   .field-row > * {
     font-size: 0.875rem;
+  }
+
+  .field-resolution {
+    font-size: 0.8125rem;
   }
 }
 
@@ -651,14 +673,24 @@ def _render_type(
 def _render_field(field_report: FieldCoverage) -> str:
     status = "covered" if field_report.covered else "missing"
     name = escape(field_report.name)
+    resolution = " · ".join(escape(item) for item in field_report.resolution)
+    field_content = (
+        f"""<div class="field-content">
+                          <code>{name}</code>
+                          <span class="field-resolution">via {resolution}</span>
+                        </div>"""
+        if resolution
+        else f"<code>{name}</code>"
+    )
+    resolution_label = f", via {resolution}" if resolution else ""
     return f"""
                     <tr
                       class="field-row"
                       data-status="{status}"
-                      aria-label="{name}, {status}"
+                      aria-label="{name}, {status}{resolution_label}"
                     >
                       <th class="field-name-cell" scope="row">
-                        <code>{name}</code>
+                        {field_content}
                       </th>
                     </tr>"""
 

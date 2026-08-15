@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import inspect
 from collections import deque
+from contextlib import suppress
 from dataclasses import dataclass, field
 from hashlib import sha256
 from threading import Lock
@@ -41,6 +43,7 @@ class FieldDefinition:
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    resolution: tuple[str, ...]
 
     @property
     def coordinate(self) -> Coordinate:
@@ -80,6 +83,7 @@ class _SerializedField(TypedDict):
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    resolution: list[str]
 
 
 class _SerializedFieldSet(TypedDict):
@@ -113,6 +117,7 @@ class FieldCoverage:
 
     name: str
     covered: bool
+    resolution: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -270,6 +275,7 @@ class CoverageController:
                             explicit_graphql_field_name=(
                                 field_definition.explicit_graphql_field_name
                             ),
+                            resolution=list(field_definition.resolution),
                         )
                         for field_definition in key
                     ],
@@ -287,7 +293,16 @@ class CoverageController:
         with self._lock:
             for serialized in snapshot["field_sets"]:
                 fields = tuple(
-                    FieldDefinition(**serialized_field)
+                    FieldDefinition(
+                        graphql_type_name=serialized_field["graphql_type_name"],
+                        graphql_field_name=serialized_field["graphql_field_name"],
+                        python_type_name=serialized_field["python_type_name"],
+                        python_field_name=serialized_field["python_field_name"],
+                        explicit_graphql_field_name=serialized_field[
+                            "explicit_graphql_field_name"
+                        ],
+                        resolution=tuple(serialized_field["resolution"]),
+                    )
                     for serialized_field in serialized["fields"]
                 )
                 coverage = self._field_sets.setdefault(
@@ -329,6 +344,7 @@ class CoverageController:
                             FieldCoverage(
                                 name=field_definition.display_field_name,
                                 covered=field_definition.coordinate in hits,
+                                resolution=field_definition.resolution,
                             )
                             for field_definition in ordered_fields
                         ),
@@ -465,24 +481,80 @@ def _build_field_definition(
             return None
 
     type_definition = schema.get_type_by_name(type_name)
-    python_type_name = (
-        type_definition.origin.__name__
+    origin = (
+        type_definition.origin
         if isinstance(type_definition, StrawberryObjectDefinition)
-        else type_name
+        else None
     )
+    python_type_name = origin.__name__ if origin is not None else type_name
     python_field_name = (
         strawberry_field.python_name if strawberry_field is not None else field_name
     )
     explicit_graphql_field_name = (
         strawberry_field.graphql_name if strawberry_field is not None else None
     )
+    resolution = _field_resolution(strawberry_field, origin)
     return FieldDefinition(
         graphql_type_name=type_name,
         graphql_field_name=field_name,
         python_type_name=python_type_name,
         python_field_name=python_field_name,
         explicit_graphql_field_name=explicit_graphql_field_name,
+        resolution=resolution,
     )
+
+
+def _field_resolution(
+    strawberry_field: StrawberryField | None,
+    origin: type[object] | None,
+) -> tuple[str, ...]:
+    if strawberry_field is None:
+        return ()
+
+    details: list[str] = []
+    resolver = strawberry_field.base_resolver
+    if resolver is not None:
+        target = resolver.wrapped_func
+        if isinstance(target, (classmethod, staticmethod)):
+            target = target.__func__
+        if callable(target):
+            with suppress(ValueError):
+                target = inspect.unwrap(target)
+            if not _is_inline_resolver(target, origin):
+                details.append(_resolver_name(target))
+
+    for extension in strawberry_field.extensions:
+        extension_type = type(extension)
+        if not extension_type.__module__.startswith(
+            ("strawberry.", "strawberry_django.")
+        ):
+            details.append(extension_type.__name__)
+
+    return tuple(dict.fromkeys(details))
+
+
+def _is_inline_resolver(
+    resolver: Callable[..., object],
+    origin: type[object] | None,
+) -> bool:
+    if origin is None or getattr(resolver, "__name__", None) == "<lambda>":
+        return False
+    return getattr(resolver, "__module__", None) == origin.__module__ and getattr(
+        resolver, "__qualname__", ""
+    ).startswith(f"{origin.__qualname__}.")
+
+
+def _resolver_name(resolver: Callable[..., object]) -> str:
+    name = getattr(resolver, "__name__", type(resolver).__name__)
+    if name == "<lambda>":
+        return "lambda"
+    qualname = getattr(resolver, "__qualname__", name)
+    if ".<locals>." in qualname:
+        factory = qualname.split(".<locals>.", maxsplit=1)[0].rsplit(".", maxsplit=1)[
+            -1
+        ]
+        return f"{factory}(...)"
+    return name
 
 
 def _percentage(field_count: int, hit_count: int, *, observed_schema: bool) -> float:
@@ -500,6 +572,7 @@ def _fingerprint(fields: FieldSet) -> str:
                 field_definition.python_type_name,
                 field_definition.python_field_name,
                 field_definition.explicit_graphql_field_name or "",
+                ",".join(field_definition.resolution),
             )
         )
         for field_definition in fields
