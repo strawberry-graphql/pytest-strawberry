@@ -27,26 +27,22 @@ _STYLE = """
   color-scheme: light dark;
   --canvas: #ffffff;
   --surface: #fafafa;
-  --surface-strong: #f4f4f5;
   --text: #18181b;
   --text-muted: #71717a;
   --border: rgb(24 24 27 / 10%);
-  --border-strong: rgb(24 24 27 / 18%);
+  --border-strong: rgb(24 24 27 / 20%);
   --accent: #be123c;
-  --accent-soft: #fff1f2;
   --high: #15803d;
   --high-soft: #f0fdf4;
   --medium: #a16207;
-  --medium-soft: #fffbeb;
   --low: #b91c1c;
   --low-soft: #fef2f2;
-  --excluded: #52525b;
-  --excluded-soft: #fafafa;
-  --radius: 1rem;
-  --column-row-height: calc(1.875rem + 1px);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --column-row-height: 1.75rem;
+  --cell-x: 0.5rem;
+  --type-columns: minmax(0, 1fr) 4.5rem 3rem 3rem;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-synthesis: none;
 }
 
@@ -57,7 +53,6 @@ _STYLE = """
 html {
   background: var(--canvas);
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -65,101 +60,77 @@ body {
   margin: 0;
   background: var(--canvas);
   color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 1em;
 }
 
 .page {
   isolation: isolate;
-  width: 100%;
   max-width: 90rem;
-  padding: 1.5rem 1rem;
-}
-
-.report-header {
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-h1,
-h2,
-h3,
-h4,
-p {
-  margin-top: 0;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  color: var(--text);
-  font-weight: 600;
-  text-wrap: balance;
+  padding: 1.5rem 1rem 2rem;
 }
 
 h1 {
-  margin-bottom: 0.375rem;
   font-size: 1.5rem;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
-h2 {
-  margin-bottom: 0.375rem;
-  font-size: clamp(1.375rem, 4vw, 1.625rem);
-  letter-spacing: -0.025em;
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+  margin-top: 0.75rem;
 }
 
-h3 {
-  margin-bottom: 0;
-  font-size: 1.125rem;
+.summary-score {
+  color: var(--tone);
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.empty-state p {
+.summary-detail,
+.metadata {
   color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1.5;
-  text-wrap: pretty;
 }
 
 .metadata {
-  margin-bottom: 0;
-  color: var(--text-muted);
+  margin-top: 0.25rem;
   font-size: 0.875rem;
-  font-style: italic;
-  line-height: 1.5;
 }
 
 [data-tone="high"] {
   --tone: var(--high);
-  --tone-soft: var(--high-soft);
 }
 
 [data-tone="medium"] {
   --tone: var(--medium);
-  --tone-soft: var(--medium-soft);
 }
 
 [data-tone="low"] {
   --tone: var(--low);
-  --tone-soft: var(--low-soft);
 }
 
 .notices {
   display: grid;
-  gap: 0.75rem;
-  padding-top: 1.25rem;
-}
-
-.notice {
-  padding: 0.75rem 0.875rem;
-  border-left: 3px solid var(--tone);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: var(--tone-soft);
-}
-
-.notice strong,
-.notice span {
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  gap: 0.25rem;
+  margin-top: 1rem;
 }
 
 .notice strong {
@@ -175,27 +146,21 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 0 1.5rem;
-  padding-top: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
 }
 
 .report-control {
   display: flex;
   align-items: center;
-  min-height: 2.5rem;
-  gap: 0.5rem;
-  color: var(--text);
+  min-height: 2.75rem;
+  gap: 0.625rem;
   cursor: pointer;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-.report-control-count {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 .report-control input {
-  flex: 0 0 auto;
+  flex: none;
   width: 1.25rem;
   height: 1.25rem;
   margin: 0;
@@ -212,6 +177,11 @@ h3 {
   cursor: not-allowed;
 }
 
+.report-control-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .page:has(#hide-fully-covered:checked) .type[data-fully-covered="true"] {
   display: none;
 }
@@ -224,47 +194,49 @@ h3 {
 }
 
 .schemas {
-  padding-top: 1.75rem;
+  margin-top: 1.5rem;
 }
 
-.report-controls + .schemas {
-  padding-top: 1.25rem;
-}
-
-.schema {
-  padding-bottom: 2rem;
+.schema + .schema {
+  margin-top: 2.5rem;
 }
 
 .schema-header {
   display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.75rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+  padding-bottom: 0.5rem;
 }
 
 .schema-identity {
-  margin-bottom: 0.25rem;
-  font-size: 1.125rem;
-}
-
-.schema-score {
-  color: var(--tone);
   font-size: 1rem;
-  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.schema-count {
-  margin: 0;
+.schema-summary {
   color: var(--text-muted);
   font-size: 0.875rem;
-  font-weight: 400;
 }
 
-.type-list {
-  --type-columns: minmax(0, 1fr) 4.75rem 3.25rem 3.25rem;
-  border-top: 1px solid var(--border-strong);
+.schema-summary strong {
+  color: var(--tone);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-state {
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.empty-state h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.empty-state p {
+  max-width: 40rem;
+  color: var(--text-muted);
 }
 
 .type-columns,
@@ -273,89 +245,89 @@ h3 {
   display: grid;
   grid-template-columns: var(--type-columns);
   align-items: baseline;
+  column-gap: 0.5rem;
+  padding-right: var(--cell-x);
+  padding-left: var(--cell-x);
+}
+
+.type-columns > :not(:first-child),
+.type-header-row > :not(:first-child),
+.type-total > :not(:first-child) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .type-columns {
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 0.5rem 0.5rem 0.375rem 0.75rem;
+  align-items: center;
+  height: var(--column-row-height);
+  border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
   background: var(--canvas);
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-style: italic;
-  font-weight: 500;
-  line-height: 1rem;
-}
-
-.type-columns > :not(:first-child),
-.type-header-row > :not(:first-child),
-.type-total > :not(:first-child) {
-  text-align: right;
+  line-height: 1;
 }
 
 .type {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .type-header-row {
   position: sticky;
   top: var(--column-row-height);
   z-index: 1;
-  padding: 0.625rem 0.5rem 0.625rem 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  font-size: 1rem;
-}
-
-.type-name {
-  min-width: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 600;
-  overflow-wrap: anywhere;
 }
 
 .type-identity {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
+  align-items: baseline;
+  grid-column: 1 / -1;
   min-width: 0;
-  gap: 0.125rem 0.75rem;
+  gap: 0 0.75rem;
+}
+
+.type-name {
+  font-family: var(--mono);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .type-location {
-  min-width: 0;
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.8125rem;
-  font-weight: 400;
   overflow-wrap: anywhere;
 }
 
 .type-percentage {
   color: var(--tone);
-  font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.type-header-row > .type-percentage {
+  grid-column: 2;
 }
 
 .type-percentage-empty {
   color: var(--text-muted);
-}
-
-.type-number {
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
+  font-weight: 400;
 }
 
 .field-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
   text-align: left;
 }
 
-.field-row {
+.field-row[data-status="covered"] {
   --field-background: var(--high-soft);
 }
 
@@ -363,115 +335,77 @@ h3 {
   --field-background: var(--low-soft);
 }
 
-.field-row[data-status="excluded"] {
-  --field-background: var(--excluded-soft);
-}
-
 .field-row > * {
-  padding: 0.4375rem 0.75rem;
+  padding: 0.375rem var(--cell-x);
   border-top: 1px solid var(--border);
-  background: var(--field-background);
-  font-size: 1rem;
-  line-height: 1.5;
+  background: var(--field-background, transparent);
+  font-weight: 400;
+  vertical-align: baseline;
 }
 
 .field-row:first-child > * {
   border-top: 0;
 }
 
-.field-name-cell {
-  color: var(--text);
-  font-weight: 400;
+.field-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+}
+
+.field-content > * {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .field-row[data-status="excluded"] .field-name-cell {
-  color: var(--excluded);
-}
-
-.field-content {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.125rem;
-  min-width: 0;
-}
-
-.field-resolution {
-  min-width: 0;
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.9375rem;
-  font-weight: 400;
-  overflow-wrap: anywhere;
 }
 
-.field-details {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: baseline;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  min-width: 0;
-  gap: 0.25rem 1rem;
+.field-location,
+.field-resolution {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 0.875rem;
 }
 
 .field-location {
-  min-width: 0;
+  white-space: nowrap;
+}
+
+.field-status-cell {
+  width: 1%;
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.9375rem;
-  font-weight: 400;
-  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  text-align: right;
+  white-space: nowrap;
 }
 
-.field-note {
-  color: var(--excluded);
-}
-
-.field-name-cell code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+.field-row[data-status="missing"] .field-status-cell {
+  color: var(--low);
 }
 
 .type-total {
-  padding: 0.625rem 0.5rem 0.625rem 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-strong);
-  font-size: 1rem;
   font-weight: 600;
-}
-
-.type-total-label {
-  color: var(--text);
-}
-
-.empty-state {
-  padding: 2rem;
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.empty-state h2 {
-  margin-bottom: 0.5rem;
-  font-size: 1.25rem;
-}
-
-.empty-state p {
-  margin-bottom: 0;
 }
 
 .report-footer {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.75rem 1.5rem;
-  padding-top: 1.25rem;
+  gap: 0.25rem 1.5rem;
+  margin-top: 2rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.8125rem;
 }
 
 .report-footer span {
-  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -488,20 +422,25 @@ h3 {
 }
 
 @media (min-width: 48rem) {
+  :root {
+    --cell-x: 0.75rem;
+    --type-columns: minmax(0, 1fr) 5.5rem 4rem 4rem;
+  }
+
   .page {
-    padding: 2.5rem 3rem 2rem;
+    padding: 2.5rem 3rem 3rem;
   }
 
   h1 {
-    font-size: 2.125rem;
+    font-size: 1.75rem;
   }
 
-  .empty-state p {
-    font-size: 0.9375rem;
+  .summary-score {
+    font-size: 2rem;
   }
 
   .report-control {
-    min-height: 2rem;
+    min-height: 2.25rem;
     font-size: 0.875rem;
   }
 
@@ -510,32 +449,24 @@ h3 {
     height: 1rem;
   }
 
-  .type-list {
-    --type-columns: minmax(0, 1fr) 5.5rem 4rem 4rem;
-  }
-
-  .field-content {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 0 1.25rem;
-  }
-
-  .field-content > code {
-    flex: 0 0 min(16rem, 100%);
-    min-width: 0;
+  .type-identity {
+    grid-column: auto;
   }
 
   .type-header-row,
-  .type-total {
-    font-size: 0.875rem;
-  }
-
+  .type-total,
   .field-row > * {
     font-size: 0.875rem;
   }
 
+  .field-row > * {
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+  }
+
+  .field-location,
   .field-resolution,
-  .field-location {
+  .field-status-cell {
     font-size: 0.8125rem;
   }
 }
@@ -544,27 +475,16 @@ h3 {
   :root {
     --canvas: #09090b;
     --surface: #18181b;
-    --surface-strong: #27272a;
     --text: #f4f4f5;
     --text-muted: #a1a1aa;
     --border: rgb(244 244 245 / 10%);
-    --border-strong: rgb(244 244 245 / 18%);
+    --border-strong: rgb(244 244 245 / 20%);
     --accent: #fb7185;
-    --accent-soft: #09090b;
     --high: #4ade80;
-    --high-soft: rgb(74 222 128 / 6%);
+    --high-soft: rgb(74 222 128 / 7%);
     --medium: #fbbf24;
-    --medium-soft: #09090b;
     --low: #f87171;
-    --low-soft: rgb(248 113 113 / 7%);
-    --excluded: #a1a1aa;
-    --excluded-soft: rgb(161 161 170 / 5%);
-  }
-
-  .notice {
-    border-top: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    --low-soft: rgb(248 113 113 / 8%);
   }
 }
 
@@ -573,15 +493,16 @@ h3 {
     color-scheme: light;
     --canvas: #ffffff;
     --surface: #fafafa;
-    --surface-strong: #f4f4f5;
     --text: #18181b;
     --text-muted: #52525b;
     --border: rgb(24 24 27 / 15%);
-    --border-strong: rgb(24 24 27 / 25%);
+    --border-strong: rgb(24 24 27 / 30%);
+    --high-soft: #f0fdf4;
+    --low-soft: #fef2f2;
   }
 
   .page {
-    width: 100%;
+    max-width: none;
     padding: 0;
   }
 
@@ -594,9 +515,9 @@ h3 {
     display: none;
   }
 
-  .schema-header,
   .type-header-row,
   .field-row,
+  .type-total,
   .report-footer {
     break-inside: avoid;
   }
@@ -621,8 +542,9 @@ def write_html_report(
 
 def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     mode = "All fields" if controller.mode == "all" else "Resolvers only"
+    schema_count = len(report.schemas)
     schemas = "\n".join(
-        _render_schema(schema, position)
+        _render_schema(schema, position, labelled=schema_count > 1)
         for position, schema in enumerate(report.schemas, start=1)
     )
     details = (
@@ -646,8 +568,6 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     )
     notices = _render_notices(report, controller)
     controls = _render_controls(report, controller)
-    schema_count = len(report.schemas)
-    schema_label = _plural(schema_count, "schema")
     metadata = [mode, f"graphql-core {escape(controller.graphql_version)}"]
     if controller.subscription_executed():
         metadata.append(
@@ -655,12 +575,8 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
             if controller.supports_subscriptions
             else "subscriptions excluded"
         )
-    metadata.extend(
-        [
-            f"{report.hit_count}/{report.field_count} fields covered",
-            f"{schema_count} {schema_label}",
-        ]
-    )
+    metadata.append(f"{schema_count} {_plural(schema_count, 'schema')}")
+    tone = _coverage_tone(report.percentage)
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -674,7 +590,16 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
     <main class="page">
       <header class="report-header">
         <h1>Strawberry coverage</h1>
-        <p class="metadata">{", ".join(metadata)}</p>
+        <p class="summary">
+          <strong class="summary-score" data-tone="{tone}">
+            {report.percentage:.2f}%
+          </strong>
+          <span class="summary-detail">
+            {report.hit_count}/{report.field_count} fields covered ·
+            {report.missing_count} missing
+          </span>
+        </p>
+        <p class="metadata">{" · ".join(metadata)}</p>
       </header>
 
       {notices}
@@ -703,32 +628,32 @@ def _render_notices(
         operator = ">=" if threshold_met else "<"
         notices.append(
             f"""
-        <div class="notice" data-tone="{tone}">
+        <p class="notice" data-tone="{tone}">
           <strong>Coverage threshold {state}.</strong>
           <span>
             {report.percentage:.2f}% {operator} {controller.fail_under:.2f}%.
           </span>
-        </div>"""
+        </p>"""
         )
     if controller.subscription_warning_needed():
         notices.append(
             """
-        <div class="notice" data-tone="medium">
+        <p class="notice" data-tone="medium">
           <strong>Subscription coverage is unavailable.</strong>
           <span>
             graphql-core 3.2 does not run resolver extensions for subscriptions.
           </span>
-        </div>"""
+        </p>"""
         )
     if controller.missing_worker_output:
         notices.append(
             """
-        <div class="notice" data-tone="medium">
+        <p class="notice" data-tone="medium">
           <strong>Worker coverage is incomplete.</strong>
           <span>
             Coverage data was unavailable from at least one pytest-xdist worker.
           </span>
-        </div>"""
+        </p>"""
         )
     if not notices:
         return ""
@@ -798,28 +723,34 @@ def _render_controls(
 """
 
 
-def _render_schema(schema: SchemaCoverage, position: int) -> str:
+def _render_schema(schema: SchemaCoverage, position: int, *, labelled: bool) -> str:
     tone = _coverage_tone(schema.percentage)
     types = "\n".join(
         _render_type(type_report, schema.fingerprint, type_position)
         for type_position, type_report in enumerate(schema.types, start=1)
     )
-    return f"""
-          <article class="schema" aria-labelledby="schema-{schema.fingerprint}">
+    heading_id = f"schema-{schema.fingerprint}"
+    header = (
+        f"""
             <header class="schema-header">
-              <div>
-                <h2 class="schema-identity" id="schema-{schema.fingerprint}">
-                  Schema {position}
-                </h2>
-                <p class="schema-count">
-                  {schema.hit_count}/{schema.field_count} covered ·
-                  {schema.missing_count} missing
-                </p>
-              </div>
-              <strong class="schema-score" data-tone="{tone}">
-                {schema.percentage:.2f}%
-              </strong>
-            </header>
+              <h2 class="schema-identity" id="{heading_id}">Schema {position}</h2>
+              <p class="schema-summary">
+                <strong data-tone="{tone}">{schema.percentage:.2f}%</strong> ·
+                {schema.hit_count}/{schema.field_count} covered ·
+                {schema.missing_count} missing
+              </p>
+            </header>"""
+        if labelled
+        else ""
+    )
+    labelling = (
+        f'aria-labelledby="{heading_id}"'
+        if labelled
+        else f'aria-label="Schema {position}"'
+    )
+    return f"""
+          <article class="schema" {labelling}>
+            {header}
             <div class="type-list">
               <div class="type-columns" aria-hidden="true">
                 <span></span>
@@ -938,19 +869,11 @@ def _render_field(
             f'aria-label="{escape(location_file)}, line {escape(line_number)}">'
             f"{location}</span>"
         )
-    if not field_report.eligible:
-        details.append('<span class="field-note">not counted</span>')
     if resolution:
         details.append(f'<span class="field-resolution">via {resolution}</span>')
-    field_details = (
-        f'<span class="field-details">{"".join(details)}</span>' if details else ""
-    )
-    field_content = f"""<div class="field-content">
-                          <code>{name}</code>
-                          {field_details}
-                        </div>"""
     resolution_label = f", via {resolution}" if resolution else ""
     status_label = "not counted" if status == "excluded" else status
+    status_text = "" if status == "covered" else status_label
     return f"""
                     <tr
                       class="field-row"
@@ -958,8 +881,12 @@ def _render_field(
                       aria-label="{name}, {status_label}{resolution_label}"
                     >
                       <th class="field-name-cell" scope="row">
-                        {field_content}
+                        <span class="field-content">
+                          <code>{name}</code>
+                          {"".join(details)}
+                        </span>
                       </th>
+                      <td class="field-status-cell">{status_text}</td>
                     </tr>"""
 
 

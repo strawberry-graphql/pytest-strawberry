@@ -5,6 +5,7 @@ import re
 import graphql
 import pytest
 
+_COVERED_FIELD_COUNT = 2
 _DISTINCT_SCHEMA_COUNT = 2
 _NON_OBVIOUS_RESOLUTION_COUNT = 4
 _TERMINAL_WIDTH = 72
@@ -192,7 +193,6 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "position: sticky" in html
     assert "66.67%" in html
     assert "<h1>Strawberry coverage</h1>" in html
-    assert 'class="eyebrow"' not in html
     assert "subscriptions" not in html.lower()
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
@@ -211,23 +211,24 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert 'data-fully-covered="true"' in html
     assert 'data-status="excluded"' in html
     assert '<div class="type-columns" aria-hidden="true">' in html
-    assert 'class="type"' in html
     assert "<details" not in html
-    assert 'class="schema-code"' not in html
     assert 'class="type-header-row"' in html
     assert '<table class="field-table">' in html
     assert 'class="field-resolution"' not in html
     assert "Python type" not in html
     assert "Python field" not in html
-    assert 'class="type-details"' not in html
-    assert 'class="field-state-cell"' not in html
     assert ">Covered<" not in html
     assert ">Missing<" not in html
-    assert '<ul class="field-list"' not in html
     assert 'aria-label="viewer, covered"' in html
     assert 'aria-label="display_name, covered"' in html
     assert 'aria-label="email_address [email], missing"' in html
     assert 'aria-label="role, not counted"' in html
+    assert '<td class="field-status-cell">missing</td>' in html
+    assert '<td class="field-status-cell">not counted</td>' in html
+    assert html.count('<td class="field-status-cell"></td>') == _COVERED_FIELD_COUNT
+    assert 'class="summary-score" data-tone="medium"' in html
+    assert "2/3 fields covered" in html
+    assert 'class="schema-identity"' not in html
     role_location = re.search(
         r'<code>role</code>.*?class="field-location" '
         r'aria-label="([^"]+), line (\d+)"',
@@ -919,11 +920,19 @@ def test_distinct_schemas_get_separate_tables(pytester: pytest.Pytester) -> None
         """
     )
 
-    result = pytester.runpytest_subprocess("--strawberry-coverage", "-q")
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
 
     result.assert_outcomes(passed=1)
     assert result.stdout.str().count("Schema ") == _DISTINCT_SCHEMA_COUNT
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert html.count('class="schema-identity"') == _DISTINCT_SCHEMA_COUNT
+    assert ">Schema 1</h2>" in html
+    assert ">Schema 2</h2>" in html
 
 
 def test_python_metadata_keeps_identical_graphql_field_sets_separate(
@@ -1133,7 +1142,7 @@ def test_xdist_workers_merge_complementary_coverage(
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
     html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
     assert "100.00%" in html
-    assert "2 covered" in html
+    assert "2/2 fields covered" in html
     assert "via resolve_one" in html
     assert 'aria-label="default_value, not counted"' in html
     assert 'aria-label="conftest.py, line ' in html

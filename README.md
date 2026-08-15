@@ -78,14 +78,16 @@ Write the same coverage data to a self-contained HTML report:
 pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
 ```
 
-Open `htmlstrawberry/index.html` in a browser. The responsive report uses
-Python-first names and groups fields under their type. Soft green and red rows
-distinguish covered and missing fields. In resolver mode, fields using ordinary
-attribute lookup can be shown in gray for context while remaining excluded from
-coverage totals. Checkboxes can hide fully covered types or reveal those
-excluded fields without JavaScript. For declarations inside the pytest project
-root, the type header shows the Python file and each field shows its definition
-line.
+Open `htmlstrawberry/index.html` in a browser. The responsive report opens
+with the overall percentage, uses Python-first names, and groups compact
+single-line field rows under their type. Soft green and red rows distinguish
+covered and missing fields, and missing fields are also labeled in text so the
+state survives printing. In resolver mode, fields using ordinary attribute
+lookup can be shown as neutral `not counted` rows for context while remaining
+excluded from coverage totals. Checkboxes can hide fully covered types or reveal
+those excluded fields without JavaScript. For declarations inside the pytest
+project root, the type header shows the Python file and each field shows its
+definition line.
 Fields wired through an external resolver, resolver factory, lambda, or
 user-defined field extension also include a compact `via ...` hint. Ordinary
 inline methods and framework-generated fields remain unannotated, keeping the
