@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import re
+
 import graphql
 import pytest
 
+_COVERED_FIELD_COUNT = 2
 _DISTINCT_SCHEMA_COUNT = 2
+_NON_OBVIOUS_RESOLUTION_COUNT = 4
 _TERMINAL_WIDTH = 72
 
 
@@ -81,6 +85,7 @@ def test_all_fields_mode_includes_default_resolution(pytester: pytest.Pytester) 
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-mode=all",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
@@ -92,6 +97,10 @@ def test_all_fields_mode_includes_default_resolution(pytester: pytest.Pytester) 
             "*Overall coverage: 66.67% (2/3 fields, 1 missing)*",
         ]
     )
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert 'id="hide-fully-covered"' in html
+    assert 'id="show-excluded-fields"' not in html
+    assert not re.search(r'<tr\s+class="field-row"\s+data-status="excluded"', html)
 
 
 def test_report_uses_python_names_and_shows_explicit_graphql_aliases(
@@ -133,6 +142,352 @@ def test_report_uses_python_names_and_shows_explicit_graphql_aliases(
     assert "UserModel [PublicUser]" in output
     assert "display_name, legacy_label [legacyLabel]" in output
     assert "displayName" not in output
+
+
+def test_html_report_is_self_contained_and_uses_python_names(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type(name="User")
+        class UserModel:
+            role: str = "admin"
+
+            @strawberry.field
+            def display_name(self) -> str:
+                return "Ada"
+
+            @strawberry.field(name="email")
+            def email_address(self) -> str:
+                return "ada@example.com"
+
+        @strawberry.type(name="Query")
+        class QueryRoot:
+            @strawberry.field
+            def viewer(self) -> UserModel:
+                return UserModel()
+
+        schema = strawberry.Schema(query=QueryRoot)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ viewer { displayName } }")
+            assert result.data == {"viewer": {"displayName": "Ada"}}
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=reports/strawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*HTML report: reports/strawberry/index.html*"])
+    html = (pytester.path / "reports" / "strawberry" / "index.html").read_text()
+    assert "<!doctype html>" in html
+    assert "<style>" in html
+    assert "<script" not in html
+    assert "prefers-color-scheme: dark" in html
+    assert "position: sticky" in html
+    assert "66.67%" in html
+    assert "<h1>Strawberry coverage</h1>" in html
+    assert "subscriptions" not in html.lower()
+    assert "QueryRoot [Query]" in html
+    assert "UserModel [User]" in html
+    assert 'id="hide-fully-covered"' in html
+    assert 'name="hide-fully-covered"' in html
+    assert 'id="show-excluded-fields"' in html
+    assert 'name="show-excluded-fields"' in html
+    assert "Show excluded fields" in html
+    excluded_control = re.search(
+        r'<input\s+id="show-excluded-fields"(?P<attributes>.*?)>',
+        html,
+        re.DOTALL,
+    )
+    assert excluded_control is not None
+    assert "checked" not in excluded_control.group("attributes")
+    assert 'data-fully-covered="true"' in html
+    assert all(
+        marker in html
+        for marker in (
+            'data-status="excluded"',
+            "--excluded-soft: #f5f5ed;",
+            '.field-row[data-status="excluded"] {',
+        )
+    )
+    assert '<div class="type-columns" aria-hidden="true">' in html
+    assert "<details" not in html
+    assert 'class="type-header-row"' in html
+    assert '<table class="field-table">' in html
+    assert 'class="field-resolution"' not in html
+    assert not any(label in html for label in ("Python type", "Python field"))
+    assert ">Covered<" not in html
+    assert ">Missing<" not in html
+    assert 'aria-label="viewer, covered"' in html
+    assert 'aria-label="display_name, covered"' in html
+    assert 'aria-label="email_address [email], missing"' in html
+    assert 'aria-label="role, not counted"' in html
+    assert '<td class="field-status-cell">missing</td>' in html
+    assert '<td class="field-status-cell">not counted</td>' in html
+    assert html.count('<td class="field-status-cell"></td>') == _COVERED_FIELD_COUNT
+    assert "--high-soft: #dcfce7;" in html
+    assert 'class="summary-score" data-tone="medium"' in html
+    assert "2/3 fields covered" in html
+    assert 'class="schema-identity"' not in html
+    role_location = re.search(
+        r'<code>role</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert role_location is not None
+    relative_path, line_number = role_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip() == 'role: str = "admin"'
+    assert "Resolvers only" in html
+
+
+def test_html_report_write_failure_fails_the_run(pytester: pytest.Pytester) -> None:
+    pytester.makepyfile("def test_passes(): pass")
+    report_directory = pytester.path / "not-a-directory"
+    report_directory.write_text("file")
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        f"--strawberry-coverage-html={report_directory}",
+        "-q",
+    )
+
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*HTML report: failed to write*"])
+
+
+def test_html_report_marks_excluded_only_types_as_not_scored(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type
+        class Profile:
+            name: str
+
+        @strawberry.type
+        class Query:
+            @strawberry.field
+            def profile(self) -> Profile:
+                return Profile(name="Ada")
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ profile { name } }")
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (1/1 fields, 0 missing)*"])
+    assert "│ Profile" not in result.stdout.str()
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    profile = re.search(
+        r'<section\s+class="type"\s+data-fully-covered="false"\s+'
+        r'data-only-excluded="true".*?aria-label="Profile,\s+not scored,\s+'
+        r'0 fields, 0 missing".*?type-percentage-empty">—</span>',
+        html,
+        re.DOTALL,
+    )
+    assert profile is not None
+    assert "Show excluded fields" in html
+    assert '<span class="report-control-count">(1)</span>' in html
+
+
+def test_html_report_identifies_non_obvious_field_resolution(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+        from strawberry.extensions import FieldExtension
+
+        def external_resolver() -> str:
+            return "external"
+
+        def make_resolver(value: str):
+            def resolver() -> str:
+                return value
+
+            return resolver
+
+        class AuditExtension(FieldExtension):
+            def resolve(self, next_, source, info, **kwargs):
+                return next_(source, info, **kwargs)
+
+        @strawberry.type
+        class Query:
+            @strawberry.field
+            def inline(self) -> str:
+                return "inline"
+
+            external: str = strawberry.field(resolver=external_resolver)
+            generated: str = strawberry.field(resolver=make_resolver("generated"))
+            anonymous: str = strawberry.field(resolver=lambda: "anonymous")
+            extended: str = strawberry.field(
+                resolver=external_resolver,
+                extensions=[AuditExtension()],
+            )
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync(
+                "{ inline external generated anonymous extended }"
+            )
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    report_directory = pytester.path / "htmlstrawberry"
+    html = (report_directory / "index.html").read_text()
+    assert 'aria-label="inline, covered"' in html
+    assert "via external_resolver" in html
+    assert "via make_resolver(...)" in html
+    assert "via lambda" in html
+    assert "via external_resolver · AuditExtension" in html
+    assert html.count('class="field-resolution"') == _NON_OBVIOUS_RESOLUTION_COUNT
+    external_location = re.search(
+        r'<code>external</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert external_location is not None
+    relative_path, line_number = external_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip().startswith("external: str = strawberry.field")
+    assert not list(report_directory.glob("source-*.html"))
+
+
+def test_user_field_extensions_count_as_resolver_coverage(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+        from strawberry.extensions import FieldExtension
+
+        class UppercaseExtension(FieldExtension):
+            def resolve(self, next_, source, info, **kwargs):
+                return next_(source, info, **kwargs).upper()
+
+        @strawberry.type
+        class Query:
+            value: str = strawberry.field(extensions=[UppercaseExtension()])
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync(
+                "{ value }",
+                root_value=Query(value="hello"),
+            )
+            assert result.data == {"value": "HELLO"}
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (1/1 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert 'aria-label="value, covered, via UppercaseExtension"' in html
+    assert 'aria-label="value, not counted' not in html
+
+
+def test_html_report_locates_inherited_field_declarations(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type
+        class BaseQuery:
+            @strawberry.field
+            def inherited(self) -> str:
+                return "inherited"
+
+        @strawberry.type
+        class Query(BaseQuery):
+            @strawberry.field
+            def local(self) -> str:
+                return "local"
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ inherited local }")
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    inherited_location = re.search(
+        r'<code>inherited</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert inherited_location is not None
+    relative_path, line_number = inherited_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip() == "def inherited(self) -> str:"
+
+
+def test_html_report_rejects_an_empty_directory(pytester: pytest.Pytester) -> None:
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=",
+        "-q",
+    )
+
+    assert result.ret == pytest.ExitCode.USAGE_ERROR
+    result.stderr.fnmatch_lines(["*must be a non-empty directory*"])
+    assert not (pytester.path / "index.html").exists()
 
 
 def test_report_wraps_long_missing_fields_to_the_terminal_width(
@@ -463,6 +818,7 @@ def test_fail_under_fails_an_otherwise_passing_run(pytester: pytest.Pytester) ->
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=1",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
@@ -475,6 +831,8 @@ def test_fail_under_fails_an_otherwise_passing_run(pytester: pytest.Pytester) ->
             "*Coverage threshold: not met (0.00% < 1.00%)*",
         ]
     )
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert "Coverage threshold not met." in html
 
 
 @pytest.mark.parametrize(
@@ -526,6 +884,7 @@ def test_fail_under_uses_the_displayed_two_decimal_percentage(
     [
         "--strawberry-coverage-mode=all",
         "--strawberry-coverage-fail-under=50",
+        "--strawberry-coverage-html=htmlstrawberry",
     ],
 )
 def test_coverage_options_require_enable_flag(
@@ -608,11 +967,19 @@ def test_distinct_schemas_get_separate_tables(pytester: pytest.Pytester) -> None
         """
     )
 
-    result = pytester.runpytest_subprocess("--strawberry-coverage", "-q")
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
 
     result.assert_outcomes(passed=1)
     assert result.stdout.str().count("Schema ") == _DISTINCT_SCHEMA_COUNT
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert html.count('class="schema-identity"') == _DISTINCT_SCHEMA_COUNT
+    assert ">Schema 1</h2>" in html
+    assert ">Schema 2</h2>" in html
 
 
 def test_python_metadata_keeps_identical_graphql_field_sets_separate(
@@ -703,10 +1070,14 @@ def test_subscription_coverage_matches_graphql_core_capability(
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-mode=all",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-n",
+        "2",
         "-q",
     )
 
     result.assert_outcomes(passed=1)
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
     if (graphql.version_info.major, graphql.version_info.minor) >= (3, 3):
         result.stdout.fnmatch_lines(
             [
@@ -714,6 +1085,7 @@ def test_subscription_coverage_matches_graphql_core_capability(
                 "*Overall coverage: 100.00% (4/4 fields, 0 missing)*",
             ]
         )
+        assert "subscriptions included" in html.lower()
         assert "did not contribute" not in result.stdout.str()
     else:
         result.stdout.fnmatch_lines(
@@ -723,6 +1095,7 @@ def test_subscription_coverage_matches_graphql_core_capability(
                 "*WARNING: Subscription executions did not contribute*",
             ]
         )
+        assert "subscriptions excluded" in html.lower()
 
 
 def test_collect_only_suppresses_reporting_and_gating(
@@ -733,12 +1106,14 @@ def test_collect_only_suppresses_reporting_and_gating(
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=100",
+        "--strawberry-coverage-html=htmlstrawberry",
         "--collect-only",
         "-q",
     )
 
     assert result.ret == pytest.ExitCode.OK
     assert "Strawberry coverage" not in result.stdout.str()
+    assert not (pytester.path / "htmlstrawberry").exists()
 
 
 def test_plugin_is_inert_without_enable_flag(pytester: pytest.Pytester) -> None:
@@ -772,11 +1147,13 @@ def test_xdist_workers_merge_complementary_coverage(
         """
         import strawberry
 
+        def resolve_one() -> str:
+            return "one"
+
         @strawberry.type
         class Query:
-            @strawberry.field
-            def one(self) -> str:
-                return "one"
+            default_value: str = "default"
+            one: str = strawberry.field(resolver=resolve_one)
 
             @strawberry.field
             def two(self) -> str:
@@ -804,8 +1181,15 @@ def test_xdist_workers_merge_complementary_coverage(
         "-n2",
         "--strawberry-coverage",
         "--strawberry-coverage-fail-under=100",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
     result.assert_outcomes(passed=2)
     result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (2/2 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert "100.00%" in html
+    assert "2/2 fields covered" in html
+    assert "via resolve_one" in html
+    assert 'aria-label="default_value, not counted"' in html
+    assert 'aria-label="conftest.py, line ' in html

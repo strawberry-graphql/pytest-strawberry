@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 from collections import deque
+from contextlib import suppress
 from dataclasses import dataclass, field
 from hashlib import sha256
+from pathlib import Path
+from textwrap import dedent
 from threading import Lock
 from typing import TYPE_CHECKING, Literal, Protocol, TypedDict, cast
 from weakref import WeakKeyDictionary
@@ -41,6 +46,9 @@ class FieldDefinition:
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    eligible: bool
+    resolution: tuple[str, ...]
+    location: str | None = field(compare=False)
 
     @property
     def coordinate(self) -> Coordinate:
@@ -80,6 +88,9 @@ class _SerializedField(TypedDict):
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    eligible: bool
+    resolution: list[str]
+    location: str | None
 
 
 class _SerializedFieldSet(TypedDict):
@@ -91,7 +102,7 @@ class CoverageSnapshot(TypedDict):
     """JSON-serializable xdist worker output."""
 
     field_sets: list[_SerializedFieldSet]
-    unsupported_subscription_executed: bool
+    subscription_executed: bool
 
 
 @dataclass
@@ -103,8 +114,21 @@ class _FieldSetCoverage:
     def __post_init__(self) -> None:
         """Cache coordinates checked for every resolver call."""
         self.coordinates = frozenset(
-            field_definition.coordinate for field_definition in self.fields
+            field_definition.coordinate
+            for field_definition in self.fields
+            if field_definition.eligible
         )
+
+
+@dataclass(frozen=True)
+class FieldCoverage:
+    """Coverage status for one Python-facing field."""
+
+    name: str
+    covered: bool
+    eligible: bool
+    resolution: tuple[str, ...]
+    location: str | None
 
 
 @dataclass(frozen=True)
@@ -112,8 +136,19 @@ class TypeCoverage:
     """Coverage values for one Python type backing a GraphQL object."""
 
     name: str
-    field_count: int
-    missing: tuple[str, ...]
+    fields: tuple[FieldCoverage, ...]
+
+    @property
+    def field_count(self) -> int:
+        """Return the number of eligible fields."""
+        return sum(field.eligible for field in self.fields)
+
+    @property
+    def missing(self) -> tuple[str, ...]:
+        """Return uncovered field names for the terminal reporter."""
+        return tuple(
+            field.name for field in self.fields if field.eligible and not field.covered
+        )
 
     @property
     def percentage(self) -> float:
@@ -171,10 +206,16 @@ class CoverageReport:
 class CoverageController:
     """Own schema instrumentation and aggregate field execution data."""
 
-    def __init__(self, mode: CoverageMode, fail_under: float | None) -> None:
+    def __init__(
+        self,
+        mode: CoverageMode,
+        fail_under: float | None,
+        project_root: Path,
+    ) -> None:
         """Initialize an isolated collector for one pytest process."""
         self.mode = mode
         self.fail_under = fail_under
+        self.project_root = project_root.resolve()
         self.supports_subscriptions = (
             graphql.version_info.major,
             graphql.version_info.minor,
@@ -188,7 +229,7 @@ class CoverageController:
             WeakKeyDictionary()
         )
         self._field_sets: dict[FieldSet, _FieldSetCoverage] = {}
-        self._unsupported_subscription_executed = False
+        self._subscription_executed = False
         self._original_get_extensions: _GetExtensions | None = None
         self._instrumented_get_extensions: _GetExtensions | None = None
 
@@ -230,10 +271,10 @@ class CoverageController:
             if coordinate in data.coordinates:
                 data.hits.add(coordinate)
 
-    def record_unsupported_subscription(self) -> None:
-        """Remember that graphql-core could not instrument a subscription."""
+    def record_subscription(self) -> None:
+        """Remember that a subscription operation was executed."""
         with self._lock:
-            self._unsupported_subscription_executed = True
+            self._subscription_executed = True
 
     def mark_missing_worker_output(self) -> None:
         """Mark an xdist worker whose coverage payload was unavailable."""
@@ -253,6 +294,9 @@ class CoverageController:
                             explicit_graphql_field_name=(
                                 field_definition.explicit_graphql_field_name
                             ),
+                            eligible=field_definition.eligible,
+                            resolution=list(field_definition.resolution),
+                            location=field_definition.location,
                         )
                         for field_definition in key
                     ],
@@ -262,9 +306,7 @@ class CoverageController:
             ]
             return CoverageSnapshot(
                 field_sets=field_sets,
-                unsupported_subscription_executed=(
-                    self._unsupported_subscription_executed
-                ),
+                subscription_executed=self._subscription_executed,
             )
 
     def merge(self, snapshot: CoverageSnapshot) -> None:
@@ -272,7 +314,18 @@ class CoverageController:
         with self._lock:
             for serialized in snapshot["field_sets"]:
                 fields = tuple(
-                    FieldDefinition(**serialized_field)
+                    FieldDefinition(
+                        graphql_type_name=serialized_field["graphql_type_name"],
+                        graphql_field_name=serialized_field["graphql_field_name"],
+                        python_type_name=serialized_field["python_type_name"],
+                        python_field_name=serialized_field["python_field_name"],
+                        explicit_graphql_field_name=serialized_field[
+                            "explicit_graphql_field_name"
+                        ],
+                        eligible=serialized_field["eligible"],
+                        resolution=tuple(serialized_field["resolution"]),
+                        location=serialized_field["location"],
+                    )
                     for serialized_field in serialized["fields"]
                 )
                 coverage = self._field_sets.setdefault(
@@ -283,9 +336,7 @@ class CoverageController:
                     for type_name, field_name in serialized["hits"]
                     if (type_name, field_name) in coverage.coordinates
                 )
-            self._unsupported_subscription_executed |= snapshot[
-                "unsupported_subscription_executed"
-            ]
+            self._subscription_executed |= snapshot["subscription_executed"]
 
     def report(self) -> CoverageReport:
         """Calculate immutable coverage values from the current aggregate."""
@@ -312,11 +363,15 @@ class CoverageController:
                 type_reports.append(
                     TypeCoverage(
                         name=type_name,
-                        field_count=len(ordered_fields),
-                        missing=tuple(
-                            field_definition.display_field_name
+                        fields=tuple(
+                            FieldCoverage(
+                                name=field_definition.display_field_name,
+                                covered=field_definition.coordinate in hits,
+                                eligible=field_definition.eligible,
+                                resolution=field_definition.resolution,
+                                location=field_definition.location,
+                            )
                             for field_definition in ordered_fields
-                            if field_definition.coordinate not in hits
                         ),
                     )
                 )
@@ -324,10 +379,14 @@ class CoverageController:
                 SchemaCoverage(
                     fingerprint=_fingerprint(fields),
                     types=tuple(type_reports),
-                    field_count=len(fields),
+                    field_count=sum(
+                        field_definition.eligible for field_definition in fields
+                    ),
                     hit_count=len(
                         hits.intersection(
-                            field_definition.coordinate for field_definition in fields
+                            field_definition.coordinate
+                            for field_definition in fields
+                            if field_definition.eligible
                         )
                     ),
                 )
@@ -339,10 +398,15 @@ class CoverageController:
             hit_count=sum(schema.hit_count for schema in schemas),
         )
 
+    def subscription_executed(self) -> bool:
+        """Return whether the test run executed a subscription operation."""
+        with self._lock:
+            return self._subscription_executed
+
     def subscription_warning_needed(self) -> bool:
         """Return whether an uninstrumented 3.2 subscription was executed."""
         with self._lock:
-            return self._unsupported_subscription_executed
+            return not self.supports_subscriptions and self._subscription_executed
 
     def _observe_schema(self, schema: Schema) -> FieldSet:
         with self._lock:
@@ -354,6 +418,7 @@ class CoverageController:
             schema,
             mode=self.mode,
             include_subscriptions=self.supports_subscriptions,
+            project_root=self.project_root,
         )
         with self._lock:
             self._schema_field_sets[schema] = fields
@@ -380,16 +445,17 @@ class _CoverageExtension(SchemaExtension):
         return _next(root, info, *args, **kwargs)
 
     def on_execute(self) -> Iterator[None]:
-        if (
-            not self._controller.supports_subscriptions
-            and self.execution_context.operation_type is OperationType.SUBSCRIPTION
-        ):
-            self._controller.record_unsupported_subscription()
+        if self.execution_context.operation_type is OperationType.SUBSCRIPTION:
+            self._controller.record_subscription()
         yield None
 
 
 def _build_fields(
-    schema: Schema, *, mode: CoverageMode, include_subscriptions: bool
+    schema: Schema,
+    *,
+    mode: CoverageMode,
+    include_subscriptions: bool,
+    project_root: Path,
 ) -> FieldSet:
     document_schema = build_ast_schema(
         parse(schema.as_str()),
@@ -416,6 +482,7 @@ def _build_fields(
                     object_type.name,
                     field_name,
                     mode,
+                    project_root,
                 )
                 if field_definition is not None:
                     fields.add(field_definition)
@@ -436,37 +503,168 @@ def _build_field_definition(
     type_name: str,
     field_name: str,
     mode: CoverageMode,
+    project_root: Path,
 ) -> FieldDefinition | None:
     strawberry_field = schema.get_field_for_type(field_name, type_name)
-    if mode == "resolvers":
-        if strawberry_field is None:
-            return None
-        uses_default_lookup = (
-            strawberry_field.base_resolver is None
-            and type(strawberry_field).get_result is StrawberryField.get_result
-        )
-        if uses_default_lookup:
-            return None
+    if mode == "resolvers" and strawberry_field is None:
+        return None
+    uses_default_lookup = (
+        strawberry_field is not None
+        and strawberry_field.base_resolver is None
+        and type(strawberry_field).get_result is StrawberryField.get_result
+    )
+    has_resolver_extensions = strawberry_field is not None and any(
+        bool(getattr(extension, "has_resolver", True))
+        for extension in strawberry_field.extensions
+    )
 
     type_definition = schema.get_type_by_name(type_name)
-    python_type_name = (
-        type_definition.origin.__name__
+    origin = (
+        type_definition.origin
         if isinstance(type_definition, StrawberryObjectDefinition)
-        else type_name
+        else None
     )
+    python_type_name = origin.__name__ if origin is not None else type_name
     python_field_name = (
         strawberry_field.python_name if strawberry_field is not None else field_name
     )
     explicit_graphql_field_name = (
         strawberry_field.graphql_name if strawberry_field is not None else None
     )
+    resolution = _field_resolution(strawberry_field, origin)
+    eligible = mode == "all" or not uses_default_lookup or has_resolver_extensions
     return FieldDefinition(
         graphql_type_name=type_name,
         graphql_field_name=field_name,
         python_type_name=python_type_name,
         python_field_name=python_field_name,
         explicit_graphql_field_name=explicit_graphql_field_name,
+        eligible=eligible,
+        resolution=resolution,
+        location=_field_location(origin, python_field_name, project_root),
     )
+
+
+def _field_location(
+    origin: type[object] | None,
+    python_field_name: str,
+    project_root: Path,
+) -> str | None:
+    if origin is None:
+        return None
+    for definition_origin in origin.__mro__:
+        location = _definition_locations(definition_origin, project_root).get(
+            python_field_name
+        )
+        if location is not None:
+            return location
+    return None
+
+
+def _definition_locations(
+    origin: type[object],
+    project_root: Path,
+) -> dict[str, str]:
+    try:
+        source_path_value = inspect.getsourcefile(origin)
+        if source_path_value is None:
+            return {}
+        source_path = Path(source_path_value).resolve()
+        relative_path = source_path.relative_to(project_root.resolve())
+        source_lines, source_start = inspect.getsourcelines(origin)
+    except (OSError, TypeError, ValueError):
+        return {}
+
+    try:
+        module = ast.parse(dedent("".join(source_lines)))
+    except SyntaxError:
+        return {}
+
+    class_definition = next(
+        (
+            node
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name == origin.__name__
+        ),
+        None,
+    )
+    if class_definition is None:
+        return {}
+
+    locations: dict[str, str] = {}
+    for node in class_definition.body:
+        name = _definition_name(node)
+        if name is not None:
+            line_number = source_start + node.lineno - 1
+            locations[name] = f"{relative_path.as_posix()}:{line_number}"
+    return locations
+
+
+def _definition_name(node: ast.stmt) -> str | None:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.name
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.target.id
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                return target.id
+    return None
+
+
+def _field_resolution(
+    strawberry_field: StrawberryField | None,
+    origin: type[object] | None,
+) -> tuple[str, ...]:
+    if strawberry_field is None:
+        return ()
+
+    details: list[str] = []
+    resolver = strawberry_field.base_resolver
+    if resolver is not None:
+        target = resolver.wrapped_func
+        if isinstance(target, (classmethod, staticmethod)):
+            target = target.__func__
+        if callable(target):
+            with suppress(ValueError):
+                target = inspect.unwrap(target)
+            if not _is_inline_resolver(target, origin):
+                details.append(_resolver_name(target))
+
+    for extension in strawberry_field.extensions:
+        if not bool(getattr(extension, "has_resolver", True)):
+            continue
+        extension_type = type(extension)
+        if not extension_type.__module__.startswith(
+            ("strawberry.", "strawberry_django.")
+        ):
+            details.append(extension_type.__name__)
+
+    return tuple(dict.fromkeys(details))
+
+
+def _is_inline_resolver(
+    resolver: Callable[..., object],
+    origin: type[object] | None,
+) -> bool:
+    if origin is None or getattr(resolver, "__name__", None) == "<lambda>":
+        return False
+    return getattr(resolver, "__module__", None) == origin.__module__ and getattr(
+        resolver, "__qualname__", ""
+    ).startswith(f"{origin.__qualname__}.")
+
+
+def _resolver_name(resolver: Callable[..., object]) -> str:
+    name = getattr(resolver, "__name__", type(resolver).__name__)
+    if name == "<lambda>":
+        return "lambda"
+    qualname = getattr(resolver, "__qualname__", name)
+    if ".<locals>." in qualname:
+        factory = qualname.split(".<locals>.", maxsplit=1)[0].rsplit(".", maxsplit=1)[
+            -1
+        ]
+        return f"{factory}(...)"
+    return name
 
 
 def _percentage(field_count: int, hit_count: int, *, observed_schema: bool) -> float:
@@ -484,6 +682,8 @@ def _fingerprint(fields: FieldSet) -> str:
                 field_definition.python_type_name,
                 field_definition.python_field_name,
                 field_definition.explicit_graphql_field_name or "",
+                str(field_definition.eligible),
+                ",".join(field_definition.resolution),
             )
         )
         for field_definition in fields

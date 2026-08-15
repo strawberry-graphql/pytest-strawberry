@@ -5,6 +5,7 @@ from __future__ import annotations
 from argparse import ArgumentTypeError
 from dataclasses import dataclass
 from math import isfinite
+from pathlib import Path
 from shutil import get_terminal_size
 from textwrap import wrap
 from typing import TYPE_CHECKING, Protocol, cast
@@ -17,6 +18,7 @@ from pytest_strawberry.coverage import (
     CoverageSnapshot,
     SchemaCoverage,
 )
+from pytest_strawberry.html_report import write_html_report
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -34,6 +36,9 @@ _TYPE_HEADER = "Python type"
 @dataclass
 class _PluginState:
     controller: CoverageController | None = None
+    html_directory: Path | None = None
+    html_report: Path | None = None
+    html_error: OSError | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +80,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         metavar="PERCENT",
         help="Fail when Strawberry field coverage is below this percentage.",
     )
+    group.addoption(
+        "--strawberry-coverage-html",
+        action="store",
+        default=None,
+        metavar="DIR",
+        type=_coverage_output_directory,
+        help="Write a self-contained Strawberry coverage report to DIR.",
+    )
 
 
 def pytest_load_initial_conftests(early_config: pytest.Config) -> None:
@@ -89,19 +102,33 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtestloop(session: pytest.Session) -> Generator[None, None, None]:
-    """Apply the coverage threshold after xdist workers have returned."""
+    """Create reports and apply failures after xdist workers have returned."""
     yield
     controller = _state.controller
     if (
         controller is None
         or _is_worker(session.config)
         or session.config.getoption("collectonly")
-        or controller.fail_under is None
     ):
         return
 
-    controller.threshold_failed = controller.report().percentage < controller.fail_under
-    if controller.threshold_failed and session.testsfailed == 0:
+    report = controller.report()
+    if controller.fail_under is not None:
+        controller.threshold_failed = report.percentage < controller.fail_under
+
+    if _state.html_directory is not None:
+        try:
+            _state.html_report = write_html_report(
+                _state.html_directory,
+                report,
+                controller,
+            )
+        except OSError as error:
+            _state.html_error = error
+
+    if (
+        controller.threshold_failed or _state.html_error is not None
+    ) and session.testsfailed == 0:
         session.testsfailed += 1
 
 
@@ -186,6 +213,13 @@ def pytest_terminal_summary(
         terminalreporter.write_line(
             f" ({report.percentage:.2f}% {operator} {controller.fail_under:.2f}%)"
         )
+    if _state.html_report is not None:
+        terminalreporter.write("HTML report: ", bold=True)
+        terminalreporter.write_line(str(_state.html_report))
+    elif _state.html_error is not None:
+        terminalreporter.write("HTML report: ", bold=True)
+        terminalreporter.write("failed to write", red=True)
+        terminalreporter.write_line(f" ({_state.html_error})")
 
 
 def pytest_unconfigure() -> None:
@@ -193,6 +227,9 @@ def pytest_unconfigure() -> None:
     if _state.controller is not None:
         _state.controller.uninstall()
         _state.controller = None
+    _state.html_directory = None
+    _state.html_report = None
+    _state.html_error = None
 
 
 def _configure_coverage(config: pytest.Config) -> None:
@@ -201,16 +238,23 @@ def _configure_coverage(config: pytest.Config) -> None:
     fail_under = cast(
         "float | None", config.getoption("strawberry_coverage_fail_under")
     )
+    html_directory = cast("Path | None", config.getoption("strawberry_coverage_html"))
     if not enabled:
-        if mode is not None or fail_under is not None:
+        if mode is not None or fail_under is not None or html_directory is not None:
             msg = (
-                "--strawberry-coverage-mode and "
-                "--strawberry-coverage-fail-under require --strawberry-coverage"
+                "--strawberry-coverage-mode, --strawberry-coverage-fail-under, "
+                "and --strawberry-coverage-html require --strawberry-coverage"
             )
             raise pytest.UsageError(msg)
         return
     if _state.controller is None:
-        _state.controller = CoverageController(mode or "resolvers", fail_under)
+        _state.controller = CoverageController(
+            mode or "resolvers",
+            fail_under,
+            Path(config.rootpath),
+        )
+        if html_directory is not None:
+            _state.html_directory = html_directory
         _state.controller.install()
 
 
@@ -226,6 +270,13 @@ def _coverage_percentage(value: str) -> float:
     return percentage
 
 
+def _coverage_output_directory(value: str) -> Path:
+    if not value.strip():
+        msg = "must be a non-empty directory"
+        raise ArgumentTypeError(msg)
+    return Path(value)
+
+
 def _is_worker(config: pytest.Config) -> bool:
     return hasattr(config, "workerinput")
 
@@ -236,10 +287,13 @@ def _write_schema_report(
     terminalreporter.write_line("")
     terminalreporter.write_line(f"Schema {schema.fingerprint}", bold=True)
 
+    type_reports = tuple(
+        type_report for type_report in schema.types if type_report.field_count
+    )
     type_width = max(
         len(_TYPE_HEADER),
         len(_SUMMARY_ROW_NAME),
-        *(len(type_report.name) for type_report in schema.types),
+        *(len(type_report.name) for type_report in type_reports),
     )
     fields_width = len("Fields")
     missing_count_width = len("Miss")
@@ -253,7 +307,7 @@ def _write_schema_report(
     desired_missing_fields_width = max(
         len("Missing fields"),
         max(
-            (len(", ".join(type_report.missing)) for type_report in schema.types),
+            (len(", ".join(type_report.missing)) for type_report in type_reports),
             default=0,
         ),
     )
@@ -279,7 +333,7 @@ def _write_schema_report(
         bold=True,
     )
     terminalreporter.write_line(_table_border("├", "┼", "┤", widths))
-    for type_report in schema.types:
+    for type_report in type_reports:
         _write_coverage_row(
             terminalreporter,
             _CoverageRow(

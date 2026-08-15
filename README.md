@@ -24,9 +24,10 @@ Enable coverage on the pytest command line:
 pytest --strawberry-coverage
 ```
 
-By default, the report covers fields with explicit Strawberry resolvers or
-custom field resolution supplied by integrations such as Strawberry Django. It
-excludes fields handled only by Strawberry's ordinary attribute lookup:
+By default, the report covers fields with explicit Strawberry resolvers,
+runtime field extensions, or custom field resolution supplied by integrations
+such as Strawberry Django. It excludes fields handled only by Strawberry's
+ordinary attribute lookup:
 
 ```text
 ============================= Strawberry coverage =============================
@@ -68,9 +69,37 @@ pytest --strawberry-coverage --strawberry-coverage-fail-under=90
 ```
 
 The threshold is compared with the displayed percentage rounded to two decimal
-places. Mode and threshold options require `--strawberry-coverage`.
+places. Mode, threshold, and HTML options require `--strawberry-coverage`.
 
-Schema executions with different eligible fields or Python mappings receive
+### HTML report
+
+Write the same coverage data to a self-contained HTML report:
+
+```shell
+pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
+```
+
+Open `htmlstrawberry/index.html` in a browser. The responsive report opens
+with the overall percentage, uses Python-first names, and groups compact
+single-line field rows under their type. Clear green and red rows distinguish
+covered and missing fields, and missing fields are also labeled in text so the
+state survives printing. In resolver mode, fields using ordinary attribute
+lookup can be shown as muted yellow-gray `not counted` rows for context while
+remaining excluded from coverage totals. Checkboxes can hide fully covered
+types or reveal those excluded fields without JavaScript. For declarations
+inside the pytest project root, the type header shows the Python file and each
+field shows its definition line.
+
+Fields wired through an external resolver, resolver factory, lambda, or
+user-defined field extension also include a compact `via ...` hint. Ordinary
+inline methods and framework-generated fields remain unannotated, keeping the
+report focused on wiring that may not be obvious from Python source coverage.
+The report follows the operating system's light or dark appearance and includes
+all styles without external assets. Column labels and the current type remain
+visible while scrolling long reports. A custom output directory can be passed
+after `=`. The terminal report remains enabled.
+
+Schema executions with different field sets or Python mappings receive
 separate fingerprinted tables. Executions with the same field set are combined.
 The final threshold uses their combined field and hit totals. Coverage from
 pytest-xdist workers is merged automatically.
