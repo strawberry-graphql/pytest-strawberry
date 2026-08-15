@@ -20,6 +20,7 @@ CoverageTone = Literal["high", "medium", "low"]
 
 _HIGH_COVERAGE = 80
 _LOW_COVERAGE = 50
+_FULL_COVERAGE = 100
 
 _STYLE = """
 :root {
@@ -39,6 +40,8 @@ _STYLE = """
   --medium-soft: #fffbeb;
   --low: #b91c1c;
   --low-soft: #fef2f2;
+  --excluded: #52525b;
+  --excluded-soft: #fafafa;
   --radius: 1rem;
   --column-row-height: calc(1.875rem + 1px);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -168,8 +171,64 @@ h3 {
   color: var(--text-muted);
 }
 
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+  padding-top: 1rem;
+}
+
+.report-control {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  gap: 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.report-control-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.report-control input {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.report-control input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.report-control:has(input:disabled) {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.page:has(#hide-fully-covered:checked) .type[data-fully-covered="true"] {
+  display: none;
+}
+
+.page:not(:has(#show-excluded-fields:checked))
+  .field-row[data-status="excluded"],
+.page:not(:has(#show-excluded-fields:checked))
+  .type[data-only-excluded="true"] {
+  display: none;
+}
+
 .schemas {
   padding-top: 1.75rem;
+}
+
+.report-controls + .schemas {
+  padding-top: 1.25rem;
 }
 
 .schema {
@@ -257,10 +316,31 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.type-identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.125rem 0.75rem;
+}
+
+.type-location {
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
 .type-percentage {
   color: var(--tone);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.type-percentage-empty {
+  color: var(--text-muted);
 }
 
 .type-number {
@@ -283,6 +363,10 @@ h3 {
   --field-background: var(--low-soft);
 }
 
+.field-row[data-status="excluded"] {
+  --field-background: var(--excluded-soft);
+}
+
 .field-row > * {
   padding: 0.4375rem 0.75rem;
   border-top: 1px solid var(--border);
@@ -301,12 +385,15 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.field-row[data-status="excluded"] .field-name-cell {
+  color: var(--excluded);
+}
+
 .field-content {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.125rem;
   min-width: 0;
 }
 
@@ -317,6 +404,29 @@ h3 {
   font-size: 0.9375rem;
   font-weight: 400;
   overflow-wrap: anywhere;
+}
+
+.field-details {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.25rem 1rem;
+}
+
+.field-location {
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.field-note {
+  color: var(--excluded);
 }
 
 .field-name-cell code {
@@ -390,8 +500,29 @@ h3 {
     font-size: 0.9375rem;
   }
 
+  .report-control {
+    min-height: 2rem;
+    font-size: 0.875rem;
+  }
+
+  .report-control input {
+    width: 1rem;
+    height: 1rem;
+  }
+
   .type-list {
     --type-columns: minmax(0, 1fr) 5.5rem 4rem 4rem;
+  }
+
+  .field-content {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0 1.25rem;
+  }
+
+  .field-content > code {
+    flex: 0 0 min(16rem, 100%);
+    min-width: 0;
   }
 
   .type-header-row,
@@ -403,7 +534,8 @@ h3 {
     font-size: 0.875rem;
   }
 
-  .field-resolution {
+  .field-resolution,
+  .field-location {
     font-size: 0.8125rem;
   }
 }
@@ -425,6 +557,8 @@ h3 {
     --medium-soft: #09090b;
     --low: #f87171;
     --low-soft: rgb(248 113 113 / 7%);
+    --excluded: #a1a1aa;
+    --excluded-soft: rgb(161 161 170 / 5%);
   }
 
   .notice {
@@ -454,6 +588,10 @@ h3 {
   .type-columns,
   .type-header-row {
     position: static;
+  }
+
+  .report-controls {
+    display: none;
   }
 
   .schema-header,
@@ -507,6 +645,7 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
         """
     )
     notices = _render_notices(report, controller)
+    controls = _render_controls(report, controller)
     schema_count = len(report.schemas)
     schema_label = _plural(schema_count, "schema")
     metadata = [mode, f"graphql-core {escape(controller.graphql_version)}"]
@@ -539,6 +678,7 @@ def _render_page(report: CoverageReport, controller: CoverageController) -> str:
       </header>
 
       {notices}
+      {controls}
       {details}
 
       <footer class="report-footer">
@@ -599,6 +739,65 @@ def _render_notices(
 """
 
 
+def _render_controls(
+    report: CoverageReport,
+    controller: CoverageController,
+) -> str:
+    if not report.schemas:
+        return ""
+
+    fully_covered_count = sum(
+        type_report.field_count > 0 and not type_report.missing
+        for schema in report.schemas
+        for type_report in schema.types
+    )
+    excluded_count = sum(
+        not field_report.eligible
+        for schema in report.schemas
+        for type_report in schema.types
+        for field_report in type_report.fields
+    )
+    hide_disabled = " disabled" if fully_covered_count == 0 else ""
+    excluded_control = (
+        f"""
+        <label class="report-control" for="show-excluded-fields">
+          <input
+            id="show-excluded-fields"
+            name="show-excluded-fields"
+            type="checkbox"
+            aria-describedby="excluded-fields-description"
+          >
+          <span>
+            Show excluded fields
+            <span class="report-control-count">({excluded_count})</span>
+          </span>
+          <span class="sr-only" id="excluded-fields-description">
+            Fields resolved by ordinary attribute lookup and not counted in
+            resolver coverage.
+          </span>
+        </label>"""
+        if controller.mode == "resolvers" and excluded_count
+        else ""
+    )
+    return f"""
+      <section class="report-controls" aria-label="Report filters">
+        <label class="report-control" for="hide-fully-covered">
+          <input
+            id="hide-fully-covered"
+            name="hide-fully-covered"
+            type="checkbox"
+            {hide_disabled.strip()}
+          >
+          <span>
+            Hide fully covered types
+            <span class="report-control-count">({fully_covered_count})</span>
+          </span>
+        </label>
+        {excluded_control}
+      </section>
+"""
+
+
 def _render_schema(schema: SchemaCoverage, position: int) -> str:
     tone = _coverage_tone(schema.percentage)
     types = "\n".join(
@@ -653,23 +852,55 @@ def _render_type(
 ) -> str:
     missing = len(type_report.missing)
     tone = _coverage_tone(type_report.percentage)
+    source_files = {
+        field_report.location.rsplit(":", maxsplit=1)[0]
+        for field_report in type_report.fields
+        if field_report.location is not None
+    }
+    source_file = next(iter(source_files)) if len(source_files) == 1 else None
     fields = "\n".join(
-        _render_field(field_report) for field_report in type_report.fields
+        _render_field(field_report, source_file) for field_report in type_report.fields
     )
     type_id = f"schema-{schema_fingerprint}-type-{position}"
+    scored = type_report.field_count > 0
+    fully_covered = str(scored and type_report.percentage == _FULL_COVERAGE).lower()
+    only_excluded = str(
+        bool(type_report.fields) and type_report.field_count == 0
+    ).lower()
+    source = (
+        f'<span class="type-location">{escape(source_file)}</span>'
+        if source_file is not None
+        else ""
+    )
+    coverage = (
+        f"""<strong class="type-percentage" data-tone="{tone}">
+                    {type_report.percentage:.2f}%
+                  </strong>"""
+        if scored
+        else '<span class="type-percentage type-percentage-empty">—</span>'
+    )
+    coverage_label = (
+        f"{type_report.percentage:.2f}% coverage" if scored else "not scored"
+    )
     return f"""
-              <section class="type" aria-labelledby="{type_id}">
+              <section
+                class="type"
+                data-fully-covered="{fully_covered}"
+                data-only-excluded="{only_excluded}"
+                aria-labelledby="{type_id}"
+              >
                 <header
                   class="type-header-row"
                   id="{type_id}"
                   aria-label="{escape(type_report.name)},
-                    {type_report.percentage:.2f}% coverage,
+                    {coverage_label},
                     {type_report.field_count} fields, {missing} missing"
                 >
-                  <span class="type-name">{escape(type_report.name)}</span>
-                  <strong class="type-percentage" data-tone="{tone}">
-                    {type_report.percentage:.2f}%
-                  </strong>
+                  <span class="type-identity">
+                    <span class="type-name">{escape(type_report.name)}</span>
+                    {source}
+                  </span>
+                  {coverage}
                   <span class="type-number">{type_report.field_count}</span>
                   <span class="type-number">{missing}</span>
                 </header>
@@ -684,24 +915,47 @@ def _render_type(
               </section>"""
 
 
-def _render_field(field_report: FieldCoverage) -> str:
-    status = "covered" if field_report.covered else "missing"
+def _render_field(
+    field_report: FieldCoverage,
+    source_file: str | None,
+) -> str:
+    if not field_report.eligible:
+        status = "excluded"
+    else:
+        status = "covered" if field_report.covered else "missing"
     name = escape(field_report.name)
     resolution = " · ".join(escape(item) for item in field_report.resolution)
-    field_content = (
-        f"""<div class="field-content">
-                          <code>{name}</code>
-                          <span class="field-resolution">via {resolution}</span>
-                        </div>"""
-        if resolution
-        else f"<code>{name}</code>"
+    details: list[str] = []
+    if field_report.location is not None:
+        location_file, line_number = field_report.location.rsplit(":", maxsplit=1)
+        location = (
+            f":{escape(line_number)}"
+            if location_file == source_file
+            else escape(field_report.location)
+        )
+        details.append(
+            f'<span class="field-location" '
+            f'aria-label="{escape(location_file)}, line {escape(line_number)}">'
+            f"{location}</span>"
+        )
+    if not field_report.eligible:
+        details.append('<span class="field-note">not counted</span>')
+    if resolution:
+        details.append(f'<span class="field-resolution">via {resolution}</span>')
+    field_details = (
+        f'<span class="field-details">{"".join(details)}</span>' if details else ""
     )
+    field_content = f"""<div class="field-content">
+                          <code>{name}</code>
+                          {field_details}
+                        </div>"""
     resolution_label = f", via {resolution}" if resolution else ""
+    status_label = "not counted" if status == "excluded" else status
     return f"""
                     <tr
                       class="field-row"
                       data-status="{status}"
-                      aria-label="{name}, {status}{resolution_label}"
+                      aria-label="{name}, {status_label}{resolution_label}"
                     >
                       <th class="field-name-cell" scope="row">
                         {field_content}

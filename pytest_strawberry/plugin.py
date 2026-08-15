@@ -248,7 +248,11 @@ def _configure_coverage(config: pytest.Config) -> None:
             raise pytest.UsageError(msg)
         return
     if _state.controller is None:
-        _state.controller = CoverageController(mode or "resolvers", fail_under)
+        _state.controller = CoverageController(
+            mode or "resolvers",
+            fail_under,
+            Path(config.rootpath),
+        )
         if html_directory is not None:
             _state.html_directory = html_directory
         _state.controller.install()
@@ -283,10 +287,13 @@ def _write_schema_report(
     terminalreporter.write_line("")
     terminalreporter.write_line(f"Schema {schema.fingerprint}", bold=True)
 
+    type_reports = tuple(
+        type_report for type_report in schema.types if type_report.field_count
+    )
     type_width = max(
         len(_TYPE_HEADER),
         len(_SUMMARY_ROW_NAME),
-        *(len(type_report.name) for type_report in schema.types),
+        *(len(type_report.name) for type_report in type_reports),
     )
     fields_width = len("Fields")
     missing_count_width = len("Miss")
@@ -300,7 +307,7 @@ def _write_schema_report(
     desired_missing_fields_width = max(
         len("Missing fields"),
         max(
-            (len(", ".join(type_report.missing)) for type_report in schema.types),
+            (len(", ".join(type_report.missing)) for type_report in type_reports),
             default=0,
         ),
     )
@@ -326,7 +333,7 @@ def _write_schema_report(
         bold=True,
     )
     terminalreporter.write_line(_table_border("├", "┼", "┤", widths))
-    for type_report in schema.types:
+    for type_report in type_reports:
         _write_coverage_row(
             terminalreporter,
             _CoverageRow(

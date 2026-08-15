@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, field
 from hashlib import sha256
+from pathlib import Path
+from textwrap import dedent
 from threading import Lock
 from typing import TYPE_CHECKING, Literal, Protocol, TypedDict, cast
 from weakref import WeakKeyDictionary
@@ -43,7 +46,9 @@ class FieldDefinition:
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    eligible: bool
     resolution: tuple[str, ...]
+    location: str | None = field(compare=False)
 
     @property
     def coordinate(self) -> Coordinate:
@@ -83,7 +88,9 @@ class _SerializedField(TypedDict):
     python_type_name: str
     python_field_name: str
     explicit_graphql_field_name: str | None
+    eligible: bool
     resolution: list[str]
+    location: str | None
 
 
 class _SerializedFieldSet(TypedDict):
@@ -107,7 +114,9 @@ class _FieldSetCoverage:
     def __post_init__(self) -> None:
         """Cache coordinates checked for every resolver call."""
         self.coordinates = frozenset(
-            field_definition.coordinate for field_definition in self.fields
+            field_definition.coordinate
+            for field_definition in self.fields
+            if field_definition.eligible
         )
 
 
@@ -117,7 +126,9 @@ class FieldCoverage:
 
     name: str
     covered: bool
+    eligible: bool
     resolution: tuple[str, ...]
+    location: str | None
 
 
 @dataclass(frozen=True)
@@ -130,12 +141,14 @@ class TypeCoverage:
     @property
     def field_count(self) -> int:
         """Return the number of eligible fields."""
-        return len(self.fields)
+        return sum(field.eligible for field in self.fields)
 
     @property
     def missing(self) -> tuple[str, ...]:
         """Return uncovered field names for the terminal reporter."""
-        return tuple(field.name for field in self.fields if not field.covered)
+        return tuple(
+            field.name for field in self.fields if field.eligible and not field.covered
+        )
 
     @property
     def percentage(self) -> float:
@@ -193,10 +206,16 @@ class CoverageReport:
 class CoverageController:
     """Own schema instrumentation and aggregate field execution data."""
 
-    def __init__(self, mode: CoverageMode, fail_under: float | None) -> None:
+    def __init__(
+        self,
+        mode: CoverageMode,
+        fail_under: float | None,
+        project_root: Path,
+    ) -> None:
         """Initialize an isolated collector for one pytest process."""
         self.mode = mode
         self.fail_under = fail_under
+        self.project_root = project_root.resolve()
         self.supports_subscriptions = (
             graphql.version_info.major,
             graphql.version_info.minor,
@@ -275,7 +294,9 @@ class CoverageController:
                             explicit_graphql_field_name=(
                                 field_definition.explicit_graphql_field_name
                             ),
+                            eligible=field_definition.eligible,
                             resolution=list(field_definition.resolution),
+                            location=field_definition.location,
                         )
                         for field_definition in key
                     ],
@@ -301,7 +322,9 @@ class CoverageController:
                         explicit_graphql_field_name=serialized_field[
                             "explicit_graphql_field_name"
                         ],
+                        eligible=serialized_field["eligible"],
                         resolution=tuple(serialized_field["resolution"]),
+                        location=serialized_field["location"],
                     )
                     for serialized_field in serialized["fields"]
                 )
@@ -344,7 +367,9 @@ class CoverageController:
                             FieldCoverage(
                                 name=field_definition.display_field_name,
                                 covered=field_definition.coordinate in hits,
+                                eligible=field_definition.eligible,
                                 resolution=field_definition.resolution,
+                                location=field_definition.location,
                             )
                             for field_definition in ordered_fields
                         ),
@@ -354,10 +379,14 @@ class CoverageController:
                 SchemaCoverage(
                     fingerprint=_fingerprint(fields),
                     types=tuple(type_reports),
-                    field_count=len(fields),
+                    field_count=sum(
+                        field_definition.eligible for field_definition in fields
+                    ),
                     hit_count=len(
                         hits.intersection(
-                            field_definition.coordinate for field_definition in fields
+                            field_definition.coordinate
+                            for field_definition in fields
+                            if field_definition.eligible
                         )
                     ),
                 )
@@ -389,6 +418,7 @@ class CoverageController:
             schema,
             mode=self.mode,
             include_subscriptions=self.supports_subscriptions,
+            project_root=self.project_root,
         )
         with self._lock:
             self._schema_field_sets[schema] = fields
@@ -421,7 +451,11 @@ class _CoverageExtension(SchemaExtension):
 
 
 def _build_fields(
-    schema: Schema, *, mode: CoverageMode, include_subscriptions: bool
+    schema: Schema,
+    *,
+    mode: CoverageMode,
+    include_subscriptions: bool,
+    project_root: Path,
 ) -> FieldSet:
     document_schema = build_ast_schema(
         parse(schema.as_str()),
@@ -448,6 +482,7 @@ def _build_fields(
                     object_type.name,
                     field_name,
                     mode,
+                    project_root,
                 )
                 if field_definition is not None:
                     fields.add(field_definition)
@@ -468,17 +503,17 @@ def _build_field_definition(
     type_name: str,
     field_name: str,
     mode: CoverageMode,
+    project_root: Path,
 ) -> FieldDefinition | None:
     strawberry_field = schema.get_field_for_type(field_name, type_name)
-    if mode == "resolvers":
-        if strawberry_field is None:
-            return None
-        uses_default_lookup = (
-            strawberry_field.base_resolver is None
-            and type(strawberry_field).get_result is StrawberryField.get_result
-        )
-        if uses_default_lookup:
-            return None
+    if mode == "resolvers" and strawberry_field is None:
+        return None
+    uses_default_lookup = (
+        strawberry_field is not None
+        and strawberry_field.base_resolver is None
+        and type(strawberry_field).get_result is StrawberryField.get_result
+    )
+    eligible = mode == "all" or not uses_default_lookup
 
     type_definition = schema.get_type_by_name(type_name)
     origin = (
@@ -500,8 +535,77 @@ def _build_field_definition(
         python_type_name=python_type_name,
         python_field_name=python_field_name,
         explicit_graphql_field_name=explicit_graphql_field_name,
+        eligible=eligible,
         resolution=resolution,
+        location=_field_location(origin, python_field_name, project_root),
     )
+
+
+def _field_location(
+    origin: type[object] | None,
+    python_field_name: str,
+    project_root: Path,
+) -> str | None:
+    if origin is None:
+        return None
+    for definition_origin in origin.__mro__:
+        location = _definition_locations(definition_origin, project_root).get(
+            python_field_name
+        )
+        if location is not None:
+            return location
+    return None
+
+
+def _definition_locations(
+    origin: type[object],
+    project_root: Path,
+) -> dict[str, str]:
+    try:
+        source_path_value = inspect.getsourcefile(origin)
+        if source_path_value is None:
+            return {}
+        source_path = Path(source_path_value).resolve()
+        relative_path = source_path.relative_to(project_root.resolve())
+        source_lines, source_start = inspect.getsourcelines(origin)
+    except (OSError, TypeError, ValueError):
+        return {}
+
+    try:
+        module = ast.parse(dedent("".join(source_lines)))
+    except SyntaxError:
+        return {}
+
+    class_definition = next(
+        (
+            node
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name == origin.__name__
+        ),
+        None,
+    )
+    if class_definition is None:
+        return {}
+
+    locations: dict[str, str] = {}
+    for node in class_definition.body:
+        name = _definition_name(node)
+        if name is not None:
+            line_number = source_start + node.lineno - 1
+            locations[name] = f"{relative_path.as_posix()}:{line_number}"
+    return locations
+
+
+def _definition_name(node: ast.stmt) -> str | None:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.name
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.target.id
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                return target.id
+    return None
 
 
 def _field_resolution(
@@ -572,6 +676,7 @@ def _fingerprint(fields: FieldSet) -> str:
                 field_definition.python_type_name,
                 field_definition.python_field_name,
                 field_definition.explicit_graphql_field_name or "",
+                str(field_definition.eligible),
                 ",".join(field_definition.resolution),
             )
         )

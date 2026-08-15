@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import graphql
 import pytest
 
@@ -82,6 +84,7 @@ def test_all_fields_mode_includes_default_resolution(pytester: pytest.Pytester) 
     result = pytester.runpytest_subprocess(
         "--strawberry-coverage",
         "--strawberry-coverage-mode=all",
+        "--strawberry-coverage-html=htmlstrawberry",
         "-q",
     )
 
@@ -93,6 +96,10 @@ def test_all_fields_mode_includes_default_resolution(pytester: pytest.Pytester) 
             "*Overall coverage: 66.67% (2/3 fields, 1 missing)*",
         ]
     )
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert 'id="hide-fully-covered"' in html
+    assert 'id="show-excluded-fields"' not in html
+    assert not re.search(r'<tr\s+class="field-row"\s+data-status="excluded"', html)
 
 
 def test_report_uses_python_names_and_shows_explicit_graphql_aliases(
@@ -145,6 +152,8 @@ def test_html_report_is_self_contained_and_uses_python_names(
 
         @strawberry.type(name="User")
         class UserModel:
+            role: str = "admin"
+
             @strawberry.field
             def display_name(self) -> str:
                 return "Ada"
@@ -187,8 +196,22 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "subscriptions" not in html.lower()
     assert "QueryRoot [Query]" in html
     assert "UserModel [User]" in html
+    assert 'id="hide-fully-covered"' in html
+    assert 'name="hide-fully-covered"' in html
+    assert 'id="show-excluded-fields"' in html
+    assert 'name="show-excluded-fields"' in html
+    assert "Show excluded fields" in html
+    excluded_control = re.search(
+        r'<input\s+id="show-excluded-fields"(?P<attributes>.*?)>',
+        html,
+        re.DOTALL,
+    )
+    assert excluded_control is not None
+    assert "checked" not in excluded_control.group("attributes")
+    assert 'data-fully-covered="true"' in html
+    assert 'data-status="excluded"' in html
     assert '<div class="type-columns" aria-hidden="true">' in html
-    assert '<section class="type"' in html
+    assert 'class="type"' in html
     assert "<details" not in html
     assert 'class="schema-code"' not in html
     assert 'class="type-header-row"' in html
@@ -204,6 +227,19 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert 'aria-label="viewer, covered"' in html
     assert 'aria-label="display_name, covered"' in html
     assert 'aria-label="email_address [email], missing"' in html
+    assert 'aria-label="role, not counted"' in html
+    role_location = re.search(
+        r'<code>role</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert role_location is not None
+    relative_path, line_number = role_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip() == 'role: str = "admin"'
     assert "Resolvers only" in html
 
 
@@ -221,6 +257,53 @@ def test_html_report_write_failure_fails_the_run(pytester: pytest.Pytester) -> N
     assert result.ret == pytest.ExitCode.TESTS_FAILED
     result.assert_outcomes(passed=1)
     result.stdout.fnmatch_lines(["*HTML report: failed to write*"])
+
+
+def test_html_report_marks_excluded_only_types_as_not_scored(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type
+        class Profile:
+            name: str
+
+        @strawberry.type
+        class Query:
+            @strawberry.field
+            def profile(self) -> Profile:
+                return Profile(name="Ada")
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ profile { name } }")
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (1/1 fields, 0 missing)*"])
+    assert "│ Profile" not in result.stdout.str()
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    profile = re.search(
+        r'<section\s+class="type"\s+data-fully-covered="false"\s+'
+        r'data-only-excluded="true".*?aria-label="Profile,\s+not scored,\s+'
+        r'0 fields, 0 missing".*?type-percentage-empty">—</span>',
+        html,
+        re.DOTALL,
+    )
+    assert profile is not None
+    assert "Show excluded fields" in html
+    assert '<span class="report-control-count">(1)</span>' in html
 
 
 def test_html_report_identifies_non_obvious_field_resolution(
@@ -283,7 +366,68 @@ def test_html_report_identifies_non_obvious_field_resolution(
     assert "via lambda" in html
     assert "via external_resolver · AuditExtension" in html
     assert html.count('class="field-resolution"') == _NON_OBVIOUS_RESOLUTION_COUNT
+    external_location = re.search(
+        r'<code>external</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert external_location is not None
+    relative_path, line_number = external_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip().startswith("external: str = strawberry.field")
     assert not list(report_directory.glob("source-*.html"))
+
+
+def test_html_report_locates_inherited_field_declarations(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+
+        @strawberry.type
+        class BaseQuery:
+            @strawberry.field
+            def inherited(self) -> str:
+                return "inherited"
+
+        @strawberry.type
+        class Query(BaseQuery):
+            @strawberry.field
+            def local(self) -> str:
+                return "local"
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync("{ inherited local }")
+            assert result.errors is None
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    inherited_location = re.search(
+        r'<code>inherited</code>.*?class="field-location" '
+        r'aria-label="([^"]+), line (\d+)"',
+        html,
+        re.DOTALL,
+    )
+    assert inherited_location is not None
+    relative_path, line_number = inherited_location.groups()
+    source_line = (
+        (pytester.path / relative_path).read_text().splitlines()[int(line_number) - 1]
+    )
+    assert source_line.strip() == "def inherited(self) -> str:"
 
 
 def test_html_report_rejects_an_empty_directory(pytester: pytest.Pytester) -> None:
@@ -952,6 +1096,7 @@ def test_xdist_workers_merge_complementary_coverage(
 
         @strawberry.type
         class Query:
+            default_value: str = "default"
             one: str = strawberry.field(resolver=resolve_one)
 
             @strawberry.field
@@ -990,3 +1135,5 @@ def test_xdist_workers_merge_complementary_coverage(
     assert "100.00%" in html
     assert "2 covered" in html
     assert "via resolve_one" in html
+    assert 'aria-label="default_value, not counted"' in html
+    assert 'aria-label="conftest.py, line ' in html

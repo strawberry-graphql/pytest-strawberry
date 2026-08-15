@@ -79,18 +79,23 @@ pytest --strawberry-coverage --strawberry-coverage-html=htmlstrawberry
 ```
 
 Open `htmlstrawberry/index.html` in a browser. The responsive report uses
-Python-first names and groups every eligible field under its type. Soft green
-and red rows distinguish covered and missing fields. Fields wired through an
-external resolver, resolver factory, lambda, or user-defined field extension
-include a compact `via ...` hint. Ordinary inline methods and framework-generated
-fields remain unannotated, keeping the report focused on wiring that may not
-be obvious from Python source coverage. The report follows the operating
-system's light or dark appearance and includes all styles without external
-assets. Column labels and the current type remain visible while scrolling long
-reports. A custom output directory can be passed after `=`. The terminal report
-remains enabled.
+Python-first names and groups fields under their type. Soft green and red rows
+distinguish covered and missing fields. In resolver mode, fields using ordinary
+attribute lookup can be shown in gray for context while remaining excluded from
+coverage totals. Checkboxes can hide fully covered types or reveal those
+excluded fields without JavaScript. For declarations inside the pytest project
+root, the type header shows the Python file and each field shows its definition
+line.
+Fields wired through an external resolver, resolver factory, lambda, or
+user-defined field extension also include a compact `via ...` hint. Ordinary
+inline methods and framework-generated fields remain unannotated, keeping the
+report focused on wiring that may not be obvious from Python source coverage.
+The report follows the operating system's light or dark appearance and includes
+all styles without external assets. Column labels and the current type remain
+visible while scrolling long reports. A custom output directory can be passed
+after `=`. The terminal report remains enabled.
 
-Schema executions with different eligible fields or Python mappings receive
+Schema executions with different field sets or Python mappings receive
 separate fingerprinted tables. Executions with the same field set are combined.
 The final threshold uses their combined field and hit totals. Coverage from
 pytest-xdist workers is merged automatically.
