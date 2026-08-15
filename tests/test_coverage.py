@@ -389,6 +389,46 @@ def test_html_report_identifies_non_obvious_field_resolution(
     assert not list(report_directory.glob("source-*.html"))
 
 
+def test_user_field_extensions_count_as_resolver_coverage(
+    pytester: pytest.Pytester,
+) -> None:
+    pytester.makepyfile(
+        """
+        import strawberry
+        from strawberry.extensions import FieldExtension
+
+        class UppercaseExtension(FieldExtension):
+            def resolve(self, next_, source, info, **kwargs):
+                return next_(source, info, **kwargs).upper()
+
+        @strawberry.type
+        class Query:
+            value: str = strawberry.field(extensions=[UppercaseExtension()])
+
+        schema = strawberry.Schema(query=Query)
+
+        def test_query() -> None:
+            result = schema.execute_sync(
+                "{ value }",
+                root_value=Query(value="hello"),
+            )
+            assert result.data == {"value": "HELLO"}
+        """
+    )
+
+    result = pytester.runpytest_subprocess(
+        "--strawberry-coverage",
+        "--strawberry-coverage-html=htmlstrawberry",
+        "-q",
+    )
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines(["*Overall coverage: 100.00% (1/1 fields, 0 missing)*"])
+    html = (pytester.path / "htmlstrawberry" / "index.html").read_text()
+    assert 'aria-label="value, covered, via UppercaseExtension"' in html
+    assert 'aria-label="value, not counted' not in html
+
+
 def test_html_report_locates_inherited_field_declarations(
     pytester: pytest.Pytester,
 ) -> None:

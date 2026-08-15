@@ -513,7 +513,10 @@ def _build_field_definition(
         and strawberry_field.base_resolver is None
         and type(strawberry_field).get_result is StrawberryField.get_result
     )
-    eligible = mode == "all" or not uses_default_lookup
+    has_resolver_extensions = strawberry_field is not None and any(
+        bool(getattr(extension, "has_resolver", True))
+        for extension in strawberry_field.extensions
+    )
 
     type_definition = schema.get_type_by_name(type_name)
     origin = (
@@ -529,6 +532,7 @@ def _build_field_definition(
         strawberry_field.graphql_name if strawberry_field is not None else None
     )
     resolution = _field_resolution(strawberry_field, origin)
+    eligible = mode == "all" or not uses_default_lookup or has_resolver_extensions
     return FieldDefinition(
         graphql_type_name=type_name,
         graphql_field_name=field_name,
@@ -628,6 +632,8 @@ def _field_resolution(
                 details.append(_resolver_name(target))
 
     for extension in strawberry_field.extensions:
+        if not bool(getattr(extension, "has_resolver", True)):
+            continue
         extension_type = type(extension)
         if not extension_type.__module__.startswith(
             ("strawberry.", "strawberry_django.")
