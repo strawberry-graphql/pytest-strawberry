@@ -259,10 +259,6 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.type-details {
-  padding: 0 0.5rem 0.75rem 1.75rem;
-}
-
 .field-table {
   width: 100%;
   border-collapse: collapse;
@@ -591,7 +587,7 @@ def _render_schema(schema: SchemaCoverage, position: int) -> str:
             </header>
             <div class="type-list">
               <div class="type-columns" aria-hidden="true">
-                <span>Python type</span>
+                <span></span>
                 <span>Coverage</span>
                 <span>Fields</span>
                 <span>Miss</span>
@@ -641,16 +637,14 @@ def _render_type(
                   <span class="type-number">{type_report.field_count}</span>
                   <span class="type-number">{missing}</span>
                 </header>
-                <div class="type-details">
-                  <table class="field-table">
-                    <caption class="sr-only">
-                      Field coverage for {escape(type_report.name)}
-                    </caption>
-                    <tbody>
-                      {fields}
-                    </tbody>
-                  </table>
-                </div>
+                <table class="field-table">
+                  <caption class="sr-only">
+                    Field coverage for {escape(type_report.name)}
+                  </caption>
+                  <tbody>
+                    {fields}
+                  </tbody>
+                </table>
               </section>"""
 
 

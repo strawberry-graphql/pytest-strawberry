@@ -191,7 +191,9 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert 'class="schema-code"' not in html
     assert 'class="type-header-row"' in html
     assert '<table class="field-table">' in html
+    assert "Python type" not in html
     assert "Python field" not in html
+    assert 'class="type-details"' not in html
     assert 'class="field-state-cell"' not in html
     assert ">Covered<" not in html
     assert ">Missing<" not in html
