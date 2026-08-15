@@ -180,6 +180,7 @@ def test_html_report_is_self_contained_and_uses_python_names(
     assert "<style>" in html
     assert "<script" not in html
     assert "prefers-color-scheme: dark" in html
+    assert "position: sticky" in html
     assert "66.67%" in html
     assert "<h1>Strawberry coverage</h1>" in html
     assert 'class="eyebrow"' not in html

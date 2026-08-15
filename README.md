@@ -86,7 +86,8 @@ include a compact `via ...` hint. Ordinary inline methods and framework-generate
 fields remain unannotated, keeping the report focused on wiring that may not
 be obvious from Python source coverage. The report follows the operating
 system's light or dark appearance and includes all styles without external
-assets. A custom output directory can be passed after `=`. The terminal report
+assets. Column labels and the current type remain visible while scrolling long
+reports. A custom output directory can be passed after `=`. The terminal report
 remains enabled.
 
 Schema executions with different eligible fields or Python mappings receive

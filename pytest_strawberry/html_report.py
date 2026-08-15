@@ -40,6 +40,7 @@ _STYLE = """
   --low: #b91c1c;
   --low-soft: #fef2f2;
   --radius: 1rem;
+  --column-row-height: calc(1.875rem + 1px);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -216,12 +217,17 @@ h3 {
 }
 
 .type-columns {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding: 0.5rem 0.5rem 0.375rem 0.75rem;
   border-bottom: 1px solid var(--border-strong);
+  background: var(--canvas);
   color: var(--text-muted);
   font-size: 0.75rem;
   font-style: italic;
   font-weight: 500;
+  line-height: 1rem;
 }
 
 .type-columns > :not(:first-child),
@@ -235,6 +241,9 @@ h3 {
 }
 
 .type-header-row {
+  position: sticky;
+  top: var(--column-row-height);
+  z-index: 1;
   padding: 0.625rem 0.5rem 0.625rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -440,6 +449,11 @@ h3 {
   .page {
     width: 100%;
     padding: 0;
+  }
+
+  .type-columns,
+  .type-header-row {
+    position: static;
   }
 
   .schema-header,
